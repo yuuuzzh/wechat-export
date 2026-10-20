@@ -3,7 +3,7 @@
 本地 Flask 服务默认监听 `http://127.0.0.1:<port>`（CLI / 启动参数决定端口）。  
 所有接口仅本机可用，**无鉴权**——请勿把端口暴露到公网。
 
-对应产品版本 **2.12.x / Release `v0.2.0`**。  
+对应产品版本 **2.12.x**（下一正式 Release 计划为 `v0.2.0`）。  
 机器可读规范（从已注册的 `/api/*` 自动生成）：`GET /api/openapi.json`。浏览器可打开 `/swagger`。
 
 SSE 进度类接口（备份、导出等）返回 `text/event-stream`，事件字段一般为 `step` / `message` / `progress` / `done`。
