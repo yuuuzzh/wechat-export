@@ -1,7 +1,7 @@
 ﻿# WeChat Export · 微信导出
 
 > **维护者**：yuuu · **仓库**：https://github.com/yuuuzzh/wechat-export  
-> **版本**：2.11.20261011 · **平台**：Windows 10/11 · **微信**：4.x（已测 4.1.9 / 4.1.10 / 4.1.12.55 / 4.1.15.11）  
+> **版本**：2.12.20261020（Release `v0.2.0`）· **平台**：Windows 10/11 · **微信**：4.x（已测 4.1.9 / 4.1.10 / 4.1.12.55 / 4.1.15.11）  
 > **定位**：本地完成微信聊天记录的**分析、搜索与多格式导出**（备份是前置步骤）
 
 数据默认不出本机 · 可执行文件名 `wechat_exp.exe`（兼容分享包与旧脚本）。界面主题可切换（像素风 / 青春风 / 科技风 / 动漫风 / 微信原始风 / QQ 复古风等，持续完善）。
@@ -135,8 +135,8 @@
 | 分析与导出 | 聊天导出 · 全局搜索 · 综合报告 · 年度报告 · 词云 · 语音导出 · 收藏 / 文件传输助手 |
 | 浏览 | 聊天查看器 · 通讯录 |
 | 数据采集 | 一键备份、备份版本、媒体完整性、定时备份（每天增量 / 计划任务模板） |
-| 更多导出 | Pull 数据源 · 员工报表 |
-| 工具 | 垃圾清理 · 提取密钥 · 手动输入密钥 · 解密数据库 · 设置 |
+| 更多导出 | HTTP API / OpenAPI（Swagger）· Pull 数据源 · 员工报表 |
+| 工具 | 媒体完整性 · 垃圾清理 · 提取密钥 · 手动输入密钥 · 解密数据库 · 设置 |
 
 ---
 
@@ -422,16 +422,28 @@ python src/main.py voice-export --chat 家族群 --merge-by person --format mp3
 
 - **源码**：https://github.com/yuuuzzh/wechat-export  
 - **维护者**：yuuu  
-- **最新 Release**：https://github.com/yuuuzzh/wechat-export/releases/tag/v0.1.0  
-- **Windows 可执行文件**：https://github.com/yuuuzzh/wechat-export/releases/download/v0.1.0/WeChatExport-v0.1.0-windows-x64.exe  
+- **最新 Release**：https://github.com/yuuuzzh/wechat-export/releases/tag/v0.2.0  
+- **Windows 可执行文件**：https://github.com/yuuuzzh/wechat-export/releases/download/v0.2.0/WeChatExport-v0.2.0-windows-x64.exe  
 
 下载 exe 后双击即可；也可本地执行 `quick_build.bat` / `build.bat` 自行打包。分享包目录：`share_package/`（模板与说明）。
 
+### 8.1 v0.2.0（2.12.20261020）更新摘要
+
+相对 `v0.1.0` 的主要变化：
+
+| 方向 | 内容 |
+|------|------|
+| 归档可靠性 | 备份版本对比 / 回滚 /「这次多了哪些会话」；媒体完整性体检与一键补迁；Windows「每天增量」计划任务（bat/xml 模板） |
+| 专项导出 | 收藏（`favorite.db`，密钥覆盖时）· 文件传输助手 |
+| 对接 | 从已注册 `/api/*` 自动生成 OpenAPI（`/api/openapi.json`）与 Swagger 页（`/swagger`） |
+| 其它 | 增量备份、朋友圈离线浏览与导出、产品定位与文档整理 |
+
 > 发新版时请同步：构建产物、Release / tag、本节版本说明。  
-> `build.bat` 可能改写 `wechat_exp.spec`，构建后请还原仓库中的手工维护版本。
+> `build.bat` 可能改写 `wechat_exp.spec`，构建后请还原仓库中的手工维护版本。  
+> 若 Release 页尚无 exe，可先拉源码或自行 `quick_build.bat` 打包；附件上传后本节下载链接即可使用。
 
 反馈时请附带：程序界面或控制台截图、微信版本、Windows 版本（`winver`）。
 
 ---
 
-**最后更新**：2026-10-11 · WeChat Export by yuuu
+**最后更新**：2026-10-20 · WeChat Export by yuuu · tag `v0.2.0`
