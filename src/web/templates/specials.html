@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}收藏 / 文件传输助手 — WeChat Export{% endblock %}
+{% block content %}
+<a href="/" class="back-link">← 返回仪表盘</a>
+<h2 style="margin:0 0 4px 0">收藏 / 文件传输助手</h2>
+<p style="color:var(--px-muted);font-size:12px;margin:0 0 20px 0">
+  收藏来自 <code>favorite.db</code>（打开微信「收藏」后重新提取密钥并备份，密钥能覆盖时才会解密）。
+  文件传输助手是会话 <code>filehelper</code>，走已解密的消息库。
+</p>
+
+<div class="config-panel">
+  <h3 style="margin:0 0 8px;font-size:15px">收藏</h3>
+  <div id="fav-hint" style="font-size:12px;color:var(--px-muted);margin-bottom:10px">检查中…</div>
+  <div class="form-row">
+    <div style="flex:2"><label>关键词</label><input id="fav-q" placeholder="标题 / 正文 / 链接"></div>
+    <div style="flex:1">
+      <label>格式</label>
+      <select id="fav-fmt">
+        <option value="html" selected>HTML</option>
+        <option value="md">Markdown</option>
+        <option value="json">JSON</option>
+      </select>
+    </div>
+    <div><label>&nbsp;</label><button id="btn-fav-list" class="btn btn-secondary">预览</button></div>
+    <div><label>&nbsp;</label><button id="btn-fav-export" class="btn btn-primary">导出收藏</button></div>
+  </div>
+  <div id="fav-list" style="margin-top:12px;font-size:13px"></div>
+</div>
+
+<div class="config-panel" style="margin-top:16px">
+  <h3 style="margin:0 0 8px;font-size:15px">文件传输助手</h3>
+  <div id="fh-hint" style="font-size:12px;color:var(--px-muted);margin-bottom:10px">检查中…</div>
+  <div class="form-row">
+    <div style="flex:2"><label>关键词</label><input id="fh-q" placeholder="只匹配消息正文"></div>
+    <div style="flex:1"><label>开始</label><input id="fh-start" type="date"></div>
+    <div style="flex:1"><label>结束</label><input id="fh-end" type="date"></div>
+    <div style="flex:1">
+      <label>格式</label>
+      <select id="fh-fmt">
+        <option value="html" selected>HTML</option>
+        <option value="md">Markdown</option>
+        <option value="json">JSON</option>
+        <option value="txt">TXT</option>
+        <option value="csv">CSV</option>
+      </select>
+    </div>
+    <div><label>&nbsp;</label><button id="btn-fh-export" class="btn btn-primary">导出</button></div>
+  </div>
+</div>
+
+<div id="progress-panel" class="progress-panel" style="display:none;margin-top:16px">
+  <div class="progress-bar-outer"><div id="progress-bar" class="progress-bar-inner" style="width:0%"></div></div>
+  <div id="progress-detail" class="progress-detail" style="margin-top:8px">…</div>
+  <div id="download-box" style="margin-top:10px"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/sse_progress.js') }}"></script>
+<script>
+(function () {
+  const esc = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
+  const fmtTime = (ts) => {
+    if (!ts) return '';
+    try { return new Date(Number(ts) * 1000).toLocaleString('zh-CN'); } catch (e) { return ''; }
+  };
+
+  function showProgress() {
+    document.getElementById('progress-panel').style.display = 'block';
+    document.getElementById('download-box').innerHTML = '';
+    document.getElementById('progress-bar').style.width = '0%';
+  }
+
+  function runExport(url, body) {
+    showProgress();
+    const bar = document.getElementById('progress-bar');
+    const detail = document.getElementById('progress-detail');
+    const sse = new SseProgress(url, {
+      method: 'POST',
+      body: body,
+      onProgress: (data) => {
+        bar.style.width = Math.round((data.progress || 0) * 100) + '%';
+        detail.textContent = data.detail || data.stage || '';
+      },
+      onDone: (data) => {
+        const r = data.result || data;
+        bar.style.width = '100%';
+        const n = r.count == null ? '' : ('共 ' + r.count + ' 条');
+        detail.textContent = r.hint ? r.hint : ('导出完成 ' + n);
+        if (r.download_url) {
+          document.getElementById('download-box').innerHTML =
+            '<a class="btn btn-primary" style="text-decoration:none" href="' + esc(r.download_url) + '">下载 ' + esc(r.filename || '') + '</a>';
+        }
+      },
+      onError: (err) => { detail.textContent = '失败: ' + (err.message || err); },
+    });
+    sse.start();
+  }
+
+  function loadStatus() {
+    fetch('/api/specials/status').then(r => r.json()).then(s => {
+      const fav = s.favorites || {};
+      const fh = s.filehelper || {};
+      document.getElementById('fav-hint').textContent = fav.available
+        ? ('已解密 favorite.db · ' + (fav.count || 0) + ' 条')
+        : (fav.hint || '收藏库不可用');
+      document.getElementById('btn-fav-export').disabled = !fav.available;
+      document.getElementById('fh-hint').textContent = fh.available
+        ? ('文件传输助手 · ' + (fh.msg_count || 0) + ' 条消息')
+        : (fh.hint || '会话不可用');
+      document.getElementById('btn-fh-export').disabled = !fh.available;
+    }).catch(e => {
+      document.getElementById('fav-hint').textContent = '状态读取失败: ' + e;
+    });
+  }
+
+  document.getElementById('btn-fav-list').addEventListener('click', () => {
+    const q = document.getElementById('fav-q').value.trim();
+    const box = document.getElementById('fav-list');
+    box.textContent = '加载中…';
+    fetch('/api/specials/favorites?limit=30&q=' + encodeURIComponent(q))
+      .then(r => r.json())
+      .then(data => {
+        if (!data.ok) { box.textContent = data.error || '无法列出收藏'; return; }
+        const items = data.items || [];
+        if (!items.length) { box.textContent = '没有匹配的收藏（共 ' + (data.total || 0) + '）'; return; }
+        let html = '<div style="color:var(--px-muted);margin-bottom:8px">显示 ' + items.length + ' / ' + data.total + '</div>';
+        for (const it of items) {
+          html += '<div style="border-bottom:1px solid var(--px-border);padding:8px 0">';
+          html += '<b>' + esc(it.title || it.type_label) + '</b> ';
+          html += '<span style="color:var(--px-muted);font-size:12px">' + esc(it.type_label) + ' · ' + esc(fmtTime(it.create_time)) + '</span>';
+          if (it.body) html += '<div style="margin-top:4px;white-space:pre-wrap">' + esc(it.body).slice(0, 400) + '</div>';
+          if (it.url) html += '<div style="font-size:12px"><a href="' + esc(it.url) + '" target="_blank" rel="noopener">' + esc(it.url) + '</a></div>';
+          html += '</div>';
+        }
+        box.innerHTML = html;
+      })
+      .catch(e => { box.textContent = String(e); });
+  });
+
+  document.getElementById('btn-fav-export').addEventListener('click', () => {
+    runExport('/api/specials/favorites/export', {
+      format: document.getElementById('fav-fmt').value,
+      q: document.getElementById('fav-q').value.trim(),
+    });
+  });
+
+  document.getElementById('btn-fh-export').addEventListener('click', () => {
+    const body = {
+      format: document.getElementById('fh-fmt').value,
+      q: document.getElementById('fh-q').value.trim(),
+    };
+    const start = document.getElementById('fh-start').value;
+    const end = document.getElementById('fh-end').value;
+    if (start) body.start = start;
+    if (end) body.end = end + ' 23:59:59';
+    runExport('/api/specials/filehelper/export', body);
+  });
+
+  loadStatus();
+})();
+</script>
+{% endblock %}

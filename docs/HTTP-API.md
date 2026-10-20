@@ -3,6 +3,8 @@
 本地 Flask 服务默认监听 `http://127.0.0.1:<port>`（CLI / 启动参数决定端口）。  
 所有接口仅本机可用，**无鉴权**——请勿把端口暴露到公网。
 
+机器可读规范（从已注册的 `/api/*` 自动生成）：`GET /api/openapi.json`。浏览器可打开 `/swagger`。
+
 SSE 进度类接口（备份、导出等）返回 `text/event-stream`，事件字段一般为 `step` / `message` / `progress` / `done`。
 
 ---
@@ -94,6 +96,11 @@ Host: 127.0.0.1:5000
 | GET | `/api/backup/versions` | 列出备份版本（`base_dir` / `wxid` / `limit` 可选） |
 | GET/POST | `/api/backup/versions/diff` | 对比两版：`old` + `new` 路径 → 新增/消失会话与消息增量 |
 | POST | `/api/backup/versions/activate` | 将工作集切换到指定备份（回滚），body: `{ "path": "..." }` |
+| GET | `/api/backup/schedule/status` | 定时备份状态（计划任务 / 模板路径 / 命令预览） |
+| POST | `/api/backup/schedule/install` | 启用每天增量：`{ "time":"02:00", "days":0, "db_dir":"..." }` |
+| POST | `/api/backup/schedule/uninstall` | 停用计划任务 |
+| GET/POST | `/api/backup/schedule/template` | 仅生成 bat/xml，不注册 |
+| GET | `/api/backup/schedule/download/bat\|xml` | 下载模板 |
 | GET/POST | `/api/media/integrity` | 媒体完整性体检：缺失图片/视频/语音清单（可恢复 / 已丢失） |
 | POST | `/api/media/integrity/remigrate` | 一键补迁可恢复项（SSE） |
 | GET/POST | `/api/keys/*` | 密钥目录 / 校验 / 保存 |
@@ -119,6 +126,11 @@ Host: 127.0.0.1:5000
 | GET | `/api/sns/media?url=&token=&key=&video=` | 本地缓存或 CDN+ISAAC 解密 |
 | POST | `/api/sns/export` | 导出 JSON/HTML（SSE） |
 | GET | `/api/sns/download/<filename>` | 下载导出文件 |
+| GET | `/api/specials/status` | 收藏库与文件传输助手是否可用 |
+| GET | `/api/specials/favorites?q=&limit=&offset=` | 收藏预览 |
+| POST | `/api/specials/favorites/export` | 导出收藏 JSON/HTML/MD（SSE） |
+| POST | `/api/specials/filehelper/export` | 导出文件传输助手（SSE） |
+| GET | `/api/specials/download/<filename>` | 下载专项导出文件 |
 
 页面入口：`/sns`。聊天实况图：图片消息 XML 含 `livePhoto` / `islive` 时，`xml_parsed.is_live_photo=true`。
 

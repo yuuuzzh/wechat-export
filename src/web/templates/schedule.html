@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}定时备份 — WeChat Export{% endblock %}
+{% block content %}
+<a href="/" class="back-link">← 返回仪表盘</a>
+<h2 style="margin:0 0 4px 0">定时备份 · 每天增量</h2>
+<p style="color:var(--px-muted);font-size:12px;margin:0 0 20px 0">
+  生成 Windows 计划任务：每天自动跑一次<strong>增量备份</strong>（复用未变更的库与媒体）。
+  也可只下载 <code>.bat</code> / <code>.xml</code> 模板，自行在「任务计划程序」里导入。
+</p>
+
+<div class="config-panel">
+  <div id="status-banner" style="font-size:12px;color:var(--px-muted);line-height:1.7;margin-bottom:12px">读取状态中…</div>
+  <div class="form-row">
+    <div style="flex:1">
+      <label>每天执行时间</label>
+      <input id="cfg-time" type="time" value="02:00">
+    </div>
+    <div style="flex:1">
+      <label>消息范围</label>
+      <select id="cfg-days">
+        <option value="0" selected>全部记录（推荐，配合增量）</option>
+        <option value="30">最近 30 天</option>
+        <option value="7">最近 7 天</option>
+        <option value="90">最近 90 天</option>
+      </select>
+    </div>
+  </div>
+  <div class="form-row" style="margin-top:8px">
+    <div style="flex:2">
+      <label>微信 db_storage（无人值守必填）</label>
+      <input id="cfg-db-dir" placeholder="设置页或一键备份里选定的目录会自动填入">
+    </div>
+    <div style="flex:1">
+      <label>wxid（多账号时）</label>
+      <input id="cfg-wxid" placeholder="可选">
+    </div>
+  </div>
+  <label class="check-row" style="margin-top:10px">
+    <input type="checkbox" id="cfg-full">
+    <span>强制全量（不推荐；默认为增量）</span>
+  </label>
+  <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+    <button id="btn-install" class="btn btn-primary">启用每天增量</button>
+    <button id="btn-uninstall" class="btn btn-secondary">停用计划任务</button>
+    <button id="btn-template" class="btn btn-secondary">仅生成模板</button>
+    <button id="btn-refresh" class="btn btn-secondary">刷新状态</button>
+  </div>
+  <div id="download-links" style="margin-top:12px;font-size:12px;display:none"></div>
+  <div id="preview" style="margin-top:14px;font-size:12px;color:var(--px-muted);word-break:break-all"></div>
+</div>
+
+<div class="config-panel" style="margin-top:16px">
+  <h3 style="margin:0 0 8px;font-size:15px">说明</h3>
+  <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--px-muted);line-height:1.8">
+    <li>任务名默认 <code>WeChatExport\DailyBackup</code>，当前用户权限即可，一般无需管理员。</li>
+    <li>日志写在程序旁 <code>schedule\logs\</code>。</li>
+    <li>建议备份时微信已关闭；定时任务默认 <code>--no-harvest</code>（不后台收割图片密钥）。</li>
+    <li>密钥需事先提取并保存在本机配置中，否则解密阶段会跳过缺密钥的库。</li>
+    <li>非 Windows 或不想自动注册时：点「仅生成模板」，再手动导入 XML。</li>
+  </ul>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const esc = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
+
+  function collect() {
+    return {
+      time: document.getElementById('cfg-time').value || '02:00',
+      days: parseInt(document.getElementById('cfg-days').value, 10),
+      db_dir: document.getElementById('cfg-db-dir').value.trim(),
+      wxid: document.getElementById('cfg-wxid').value.trim(),
+      full: document.getElementById('cfg-full').checked,
+    };
+  }
+
+  function renderStatus(data) {
+    const s = data.settings || {};
+    const t = data.task || {};
+    const banner = document.getElementById('status-banner');
+    if (s.time) document.getElementById('cfg-time').value = s.time.length === 5 ? s.time : (s.time || '02:00');
+    if (s.days !== undefined && s.days !== null) document.getElementById('cfg-days').value = String(s.days);
+    if (s.db_dir) document.getElementById('cfg-db-dir').value = s.db_dir;
+    if (s.wxid) document.getElementById('cfg-wxid').value = s.wxid;
+    document.getElementById('cfg-full').checked = !!s.full;
+
+    let line = '';
+    if (t.supported === false) {
+      line = t.hint || '当前系统不支持自动注册计划任务；仍可生成模板。';
+    } else if (t.installed) {
+      line = '计划任务已安装 · 状态 ' + (t.status || '—')
+        + (t.next_run ? ' · 下次 ' + t.next_run : '')
+        + (t.last_run ? ' · 上次 ' + t.last_run : '');
+    } else {
+      line = '尚未安装计划任务。配置好时间与目录后点「启用每天增量」。';
+    }
+    banner.textContent = line;
+
+    const preview = document.getElementById('preview');
+    const argv = data.argv_preview || [];
+    const paths = data.paths || {};
+    preview.innerHTML = '命令预览：<code>' + esc(argv.join(' ')) + '</code><br>'
+      + '工作目录：<code>' + esc((data.launcher || {}).cwd || '') + '</code><br>'
+      + '模板目录：<code>' + esc(paths.schedule_dir || '') + '</code>';
+
+    const dl = document.getElementById('download-links');
+    if (paths.bat || paths.xml) {
+      dl.style.display = 'block';
+      dl.innerHTML = '下载：'
+        + '<a href="/api/backup/schedule/download/bat">daily_backup.bat</a>'
+        + ' · '
+        + '<a href="/api/backup/schedule/download/xml">WeChatExport_DailyBackup.xml</a>';
+    }
+  }
+
+  async function refresh() {
+    const res = await fetch('/api/backup/schedule/status');
+    const data = await res.json();
+    renderStatus(data);
+    return data;
+  }
+
+  async function post(url, body) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || data.hint || '请求失败');
+    return data;
+  }
+
+  document.getElementById('btn-refresh').addEventListener('click', () => {
+    refresh().catch(e => alert(e.message || e));
+  });
+  document.getElementById('btn-install').addEventListener('click', async () => {
+    try {
+      const data = await post('/api/backup/schedule/install', collect());
+      await refresh();
+      alert(data.installed ? '已启用每天增量备份' : (data.hint || '已保存模板'));
+    } catch (e) { alert(e.message || e); }
+  });
+  document.getElementById('btn-uninstall').addEventListener('click', async () => {
+    if (!confirm('停用计划任务？')) return;
+    try {
+      await post('/api/backup/schedule/uninstall', {});
+      await refresh();
+      alert('已停用');
+    } catch (e) { alert(e.message || e); }
+  });
+  document.getElementById('btn-template').addEventListener('click', async () => {
+    try {
+      const data = await post('/api/backup/schedule/template', collect());
+      await refresh();
+      alert('模板已生成\n' + (data.bat_path || '') + '\n' + (data.xml_path || ''));
+    } catch (e) { alert(e.message || e); }
+  });
+
+  refresh().catch(e => {
+    document.getElementById('status-banner').textContent = '状态读取失败: ' + (e.message || e);
+  });
+})();
+</script>
+{% endblock %}

@@ -339,8 +339,8 @@ def decrypt_for_backup(
             [f for f in os.listdir(msg_src) if f.startswith('media_') and f.endswith('.db')]
         )
         db_files = msg_files + media_files
-        # +3: contact + hardlink + sns（朋友圈，可选）
-        total = len(db_files) + 3
+        # +4: contact + hardlink + sns + favorite（后两者密钥可能缺失）
+        total = len(db_files) + 4
         for i, fname in enumerate(db_files):
             src_path = os.path.join(msg_src, fname)
             dst_path = os.path.join(msg_out, fname)
@@ -396,7 +396,7 @@ def decrypt_for_backup(
             if on_progress:
                 on_progress(f"已解密: {fname}", prog)
     else:
-        total = 3  # contact + hardlink + sns
+        total = 4  # contact + hardlink + sns + favorite
 
     # --- Contact database ---
     contact_src = os.path.join(db_storage_path, 'contact', 'contact.db')
@@ -418,9 +418,17 @@ def decrypt_for_backup(
     sns_src = os.path.join(db_storage_path, 'sns', 'sns.db')
     sns_dst = os.path.join(output_dir, 'sns', 'sns.db')
     if os.path.isfile(sns_src):
-        if not _handle_one(sns_src, sns_dst, 'sns.db', 0.99):
+        if not _handle_one(sns_src, sns_dst, 'sns.db', 0.985):
             if on_progress and _resolve_key(keys, sns_src, salt_keys) is None:
-                on_progress('跳过 sns.db (缺密钥 — 可打开微信朋友圈后重新提取密钥)', 0.99)
+                on_progress('跳过 sns.db (缺密钥 — 可打开微信朋友圈后重新提取密钥)', 0.985)
+
+    # --- Favorites (optional; WeChat loads the key when 收藏 is opened) ---
+    fav_src = os.path.join(db_storage_path, 'favorite', 'favorite.db')
+    fav_dst = os.path.join(output_dir, 'favorite', 'favorite.db')
+    if os.path.isfile(fav_src):
+        if not _handle_one(fav_src, fav_dst, 'favorite.db', 0.995):
+            if on_progress and _resolve_key(keys, fav_src, salt_keys) is None:
+                on_progress('跳过 favorite.db (缺密钥 — 请打开微信「收藏」后重新提取密钥)', 0.995)
 
     # Persist fingerprints for next incremental run
     try:

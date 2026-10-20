@@ -37,6 +37,7 @@ htmlcov/
 Thumbs.db
 
 # Generated
+/schedule/
 file_version.txt
 *.log
 *.tmp

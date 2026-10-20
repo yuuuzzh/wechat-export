@@ -213,6 +213,12 @@ def create_app(decrypted_dir: str, wxid: str = None, db_dir: str = None) -> Flas
 
     _register_blueprint(app, 'routes.backup_api', _register_backup_bp)
 
+    def _register_schedule_bp():
+        from .routes.schedule_api import schedule_bp
+        app.register_blueprint(schedule_bp)
+
+    _register_blueprint(app, 'routes.schedule_api', _register_schedule_bp)
+
     # New: Export API (SSE endpoints)
     def _register_export_bp():
         from .routes.export_api import export_bp
@@ -226,6 +232,12 @@ def create_app(decrypted_dir: str, wxid: str = None, db_dir: str = None) -> Flas
         app.register_blueprint(sns_bp)
 
     _register_blueprint(app, 'routes.sns_api', _register_sns_bp)
+
+    def _register_specials_bp():
+        from .routes.specials_api import specials_bp
+        app.register_blueprint(specials_bp)
+
+    _register_blueprint(app, 'routes.specials_api', _register_specials_bp)
 
     # New: 语音导出 API（按人批量导出语音留言）
     def _register_voice_export_bp():
@@ -316,6 +328,10 @@ def create_app(decrypted_dir: str, wxid: str = None, db_dir: str = None) -> Flas
     def backup_page():
         return render_template('backup.html')
 
+    @app.route('/schedule')
+    def schedule_page():
+        return render_template('schedule.html')
+
     @app.route('/versions')
     def versions_page():
         return render_template('versions.html')
@@ -395,6 +411,10 @@ def create_app(decrypted_dir: str, wxid: str = None, db_dir: str = None) -> Flas
     def sns_page():
         return render_template('sns.html')
 
+    @app.route('/specials')
+    def specials_page():
+        return render_template('specials.html')
+
     @app.route('/manual')
     @app.route('/docs')
     def docs_page():
@@ -409,6 +429,17 @@ def create_app(decrypted_dir: str, wxid: str = None, db_dir: str = None) -> Flas
             body_html=_render_http_api_html(),
             page_title='HTTP API — WeChat Export',
         )
+
+    @app.route('/api/openapi.json')
+    def openapi_json():
+        """Machine-readable OpenAPI 3 spec generated from registered /api/* routes."""
+        from .openapi_spec import build_openapi
+        spec = build_openapi(app, version=__version__)
+        return jsonify(spec)
+
+    @app.route('/swagger')
+    def swagger_page():
+        return render_template('swagger.html')
 
     @app.route('/docs-assets/<path:filename>')
     def docs_assets(filename):

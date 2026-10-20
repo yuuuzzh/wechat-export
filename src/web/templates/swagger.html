@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Swagger — WeChat Export{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+<style>
+#swagger-ui { background: #fff; min-height: 70vh; }
+.swagger-fallback { display: none; margin-top: 12px; }
+.swagger-fallback table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.swagger-fallback th, .swagger-fallback td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--px-border); vertical-align: top; }
+.method { font-weight: 700; font-family: ui-monospace, monospace; }
+</style>
+{% endblock %}
+{% block content %}
+<a href="/" class="back-link">← 返回仪表盘</a>
+<h2 style="margin:0 0 4px 0">OpenAPI / Swagger</h2>
+<p style="color:var(--px-muted);font-size:12px;margin:0 0 12px 0">
+  规范由已注册的 <code>/api/*</code> 自动生成 ·
+  <a href="/api/openapi.json">/api/openapi.json</a> ·
+  <a href="/api-docs">手写说明</a>
+</p>
+<div id="swagger-ui"></div>
+<div id="swagger-fallback" class="swagger-fallback config-panel">
+  <p style="margin:0 0 8px 0">Swagger UI 未加载（离线或 CDN 不可用）。下面是同一份规范的接口清单。</p>
+  <div id="fallback-body"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script>
+(function () {
+  function showFallback(spec) {
+    var box = document.getElementById('swagger-fallback');
+    var body = document.getElementById('fallback-body');
+    box.style.display = 'block';
+    if (!spec || !spec.paths) {
+      body.textContent = '无法读取 /api/openapi.json';
+      return;
+    }
+    var html = '<table><thead><tr><th>方法</th><th>路径</th><th>说明</th></tr></thead><tbody>';
+    Object.keys(spec.paths).sort().forEach(function (path) {
+      var item = spec.paths[path];
+      Object.keys(item).forEach(function (method) {
+        var op = item[method];
+        html += '<tr><td class="method">' + method.toUpperCase() + '</td><td><code>'
+          + path + '</code></td><td>' + (op.summary || '') + '</td></tr>';
+      });
+    });
+    html += '</tbody></table>';
+    body.innerHTML = html;
+  }
+
+  fetch('/api/openapi.json').then(function (r) { return r.json(); }).then(function (spec) {
+    if (window.SwaggerUIBundle) {
+      window.SwaggerUIBundle({
+        spec: spec,
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [window.SwaggerUIBundle.presets.apis],
+      });
+    } else {
+      showFallback(spec);
+    }
+  }).catch(function () { showFallback(null); });
+})();
+</script>
+{% endblock %}
