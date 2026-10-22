@@ -66,12 +66,29 @@
     <input type="checkbox" id="cfg-asr">
     <span>包含语音转文字（如有）</span>
   </label>
+  <label class="check-row"
+         title="导出文件内批量打码昵称、手机号、身份证号，方便分享演示；不修改本机备份数据">
+    <input type="checkbox" id="cfg-privacy">
+    <span>隐私脱敏导出（昵称 → 联系人甲 / 示例群聊；正文中的手机号、身份证打码）</span>
+  </label>
+  <div id="privacy-opts" style="display:none;margin:6px 0 0 24px;font-size:12px;color:var(--px-muted)">
+    <label class="check-row" style="margin:0 12px 0 0"><input type="checkbox" id="cfg-priv-nick" checked> 昵称</label>
+    <label class="check-row" style="margin:0 12px 0 0"><input type="checkbox" id="cfg-priv-phone" checked> 手机号</label>
+    <label class="check-row" style="margin:0 12px 0 0"><input type="checkbox" id="cfg-priv-id" checked> 身份证</label>
+    <label style="margin-left:8px">样式
+      <select id="cfg-priv-style" style="margin-left:4px;padding:4px 8px">
+        <option value="placeholder" selected>演示占位（联系人甲）</option>
+        <option value="asterisk">星号打码（张*三）</option>
+      </select>
+    </label>
+  </div>
 
   <p class="page-desc" style="margin:12px 0 0 0;line-height:1.7">
     <b>关键词</b>：只匹配消息正文（不含发送者昵称）。空格=AND，<code>|</code>=OR。<br>
     <b>Excel</b>：所有选中会话按时间线平铺，含「会话 / 发送者 / 类型 / 内容」列，己方消息浅橙底。<br>
     <b>HTML</b>：对话气泡样式，导出文件内可再次页内搜索高亮。<br>
     <b>会话报告包</b>：每个会话一份 ZIP（chat.html + wordcloud.html + stats.json）。<br>
+    <b>隐私脱敏</b>：仅作用于导出文件，备份库不变；适合公开分享演示。<br>
     ChatLab 远程拉取请用 <a href="/pull">Pull 数据源</a>；
     语音留言请用 <a href="/voice-export">语音导出</a>。
   </p>
@@ -274,9 +291,24 @@
         format: document.getElementById('cfg-format').value,
         merge: !!(document.getElementById('cfg-merge') && document.getElementById('cfg-merge').checked),
         include_asr: !!(document.getElementById('cfg-asr') && document.getElementById('cfg-asr').checked),
+        privacy_redact: !!(document.getElementById('cfg-privacy') && document.getElementById('cfg-privacy').checked),
+        privacy: {
+          nicknames: !!(document.getElementById('cfg-priv-nick') && document.getElementById('cfg-priv-nick').checked),
+          phones: !!(document.getElementById('cfg-priv-phone') && document.getElementById('cfg-priv-phone').checked),
+          id_cards: !!(document.getElementById('cfg-priv-id') && document.getElementById('cfg-priv-id').checked),
+          style: (document.getElementById('cfg-priv-style') || {}).value || 'placeholder',
+        },
       };
     },
   });
+
+  const privCb = document.getElementById('cfg-privacy');
+  const privOpts = document.getElementById('privacy-opts');
+  if (privCb && privOpts) {
+    const syncPriv = () => { privOpts.style.display = privCb.checked ? 'block' : 'none'; };
+    privCb.addEventListener('change', syncPriv);
+    syncPriv();
+  }
 
   // WizardPage.start 在 getBody 抛错时仍会 disable 按钮——拦截一下
   const runBtn = document.getElementById('btn-run');

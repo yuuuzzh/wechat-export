@@ -117,3 +117,21 @@ def test_api_status_and_template(tmp_path, monkeypatch):
 
     r = cli.get('/api/backup/schedule/download/bat')
     assert r.status_code == 200
+
+    r = cli.post('/api/backup/schedule/run-now', json={})
+    j = r.get_json()
+    assert j['ok']
+    assert j.get('method') in ('manual', 'bat', 'schtasks')
+
+
+def test_list_recent_logs(tmp_path, monkeypatch):
+    root = tmp_path / 'schedule'
+    log_dir = root / 'logs'
+    log_dir.mkdir(parents=True)
+    p = log_dir / 'backup_20261022.log'
+    p.write_text('line1\nline2\nDONE\n', encoding='utf-8')
+    monkeypatch.setattr(sch, 'schedule_root', lambda: str(root))
+    logs = sch.list_recent_logs(5)
+    assert len(logs) == 1
+    assert logs[0]['name'] == 'backup_20261022.log'
+    assert 'DONE' in logs[0]['tail']

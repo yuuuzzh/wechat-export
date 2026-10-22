@@ -435,6 +435,108 @@ def save_schedule_settings(settings: dict[str, Any]) -> dict[str, Any]:
     return current
 
 
+def list_recent_logs(limit: int = 8) -> list[dict[str, Any]]:
+    """Newest schedule log files under schedule/logs/."""
+    log_dir = os.path.join(schedule_root(), 'logs')
+    if not os.path.isdir(log_dir):
+        return []
+    items = []
+    try:
+        names = [n for n in os.listdir(log_dir) if n.lower().endswith('.log')]
+    except OSError:
+        return []
+    paths = []
+    for n in names:
+        p = os.path.join(log_dir, n)
+        try:
+            st = os.stat(p)
+        except OSError:
+            continue
+        paths.append((st.st_mtime, p, n, st.st_size))
+    paths.sort(reverse=True)
+    for mtime, p, n, size in paths[: max(1, min(20, int(limit or 8)))]:
+        tail = ''
+        try:
+            with open(p, 'r', encoding='utf-8', errors='replace') as f:
+                lines = f.readlines()
+            tail = ''.join(lines[-8:]).strip()
+        except OSError:
+            pass
+        items.append({
+            'name': n,
+            'path': p,
+            'size': size,
+            'mtime': int(mtime),
+            'tail': tail[:2000],
+        })
+    return items
+
+
+def run_task_now(task_name: Optional[str] = None) -> dict[str, Any]:
+    """Trigger the registered task immediately (schtasks /Run), or run the bat."""
+    settings = load_schedule_settings()
+    name = task_name or settings.get('task_name') or DEFAULT_TASK_NAME
+    bat = settings.get('bat_path') or os.path.join(schedule_root(), 'daily_backup.bat')
+    if not os.path.isfile(bat):
+        try:
+            bat = write_runner_bat(
+                days=int(settings.get('days') or 0),
+                db_dir=settings.get('db_dir') or None,
+                wxid=settings.get('wxid') or None,
+                full=bool(settings.get('full')),
+            )
+        except Exception as e:
+            return {'ok': False, 'error': f'无法生成 runner: {e}'}
+
+    if _is_windows():
+        q = query_task(name)
+        if q.get('installed'):
+            proc = _run_schtasks(['/Run', '/TN', name])
+            if proc.returncode == 0:
+                return {
+                    'ok': True,
+                    'method': 'schtasks',
+                    'task_name': name,
+                    'detail': '已请求立即运行计划任务，日志见 schedule\\logs\\',
+                }
+            # fall through to bat
+        # Direct bat start (detached)
+        try:
+            creationflags = 0
+            if hasattr(subprocess, 'CREATE_NO_WINDOW'):
+                creationflags = subprocess.CREATE_NO_WINDOW | getattr(
+                    subprocess, 'DETACHED_PROCESS', 0x00000008)
+            subprocess.Popen(
+                ['cmd.exe', '/c', bat],
+                cwd=os.path.dirname(bat),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=creationflags,
+            )
+            return {
+                'ok': True,
+                'method': 'bat',
+                'bat_path': bat,
+                'detail': '已在后台启动 daily_backup.bat',
+            }
+        except OSError as e:
+            return {'ok': False, 'error': str(e), 'bat_path': bat}
+
+    # Non-Windows: just report the command
+    return {
+        'ok': True,
+        'method': 'manual',
+        'bat_path': bat,
+        'detail': '非 Windows：请手动执行已生成的 bat / 命令',
+        'argv': build_backup_argv(
+            days=int(settings.get('days') or 0),
+            db_dir=settings.get('db_dir') or None,
+            wxid=settings.get('wxid') or None,
+            full=bool(settings.get('full')),
+        ),
+    }
+
+
 def status_bundle() -> dict[str, Any]:
     """Combined UI payload: settings + task query + paths + launcher."""
     settings = load_schedule_settings()
@@ -470,6 +572,7 @@ def status_bundle() -> dict[str, Any]:
             'xml': os.path.join(root, 'WeChatExport_DailyBackup.xml'),
             'logs': os.path.join(root, 'logs'),
         },
+        'recent_logs': list_recent_logs(8),
         'argv_preview': build_backup_argv(
             days=int(settings.get('days') or 0),
             db_dir=settings.get('db_dir') or None,

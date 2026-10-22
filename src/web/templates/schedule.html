@@ -39,8 +39,18 @@
     <input type="checkbox" id="cfg-full">
     <span>强制全量（不推荐；默认为增量）</span>
   </label>
+  <div style="margin-top:8px">
+    <button id="btn-deep" class="btn btn-secondary" style="font-size:11px">🔍 深度搜索目录</button>
+    <button id="btn-use-dir" class="btn btn-secondary" style="font-size:11px">使用该目录</button>
+  </div>
+  <div class="form-row" style="margin-top:8px">
+    <div style="flex:4"><label>检测到的数据目录</label>
+      <select id="cfg-db-dir-list" style="width:100%;padding:8px 10px;border:1px solid var(--px-border);background:var(--px-input-bg);color:var(--px-text);font-size:13px"></select>
+    </div>
+  </div>
   <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
     <button id="btn-install" class="btn btn-primary">启用每天增量</button>
+    <button id="btn-run-now" class="btn btn-secondary">立即跑一次</button>
     <button id="btn-uninstall" class="btn btn-secondary">停用计划任务</button>
     <button id="btn-template" class="btn btn-secondary">仅生成模板</button>
     <button id="btn-refresh" class="btn btn-secondary">刷新状态</button>
@@ -50,10 +60,15 @@
 </div>
 
 <div class="config-panel" style="margin-top:16px">
+  <h3 style="margin:0 0 8px;font-size:15px">最近日志</h3>
+  <div id="log-list" style="font-size:12px;color:var(--px-muted)">暂无</div>
+</div>
+
+<div class="config-panel" style="margin-top:16px">
   <h3 style="margin:0 0 8px;font-size:15px">说明</h3>
   <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--px-muted);line-height:1.8">
     <li>任务名默认 <code>WeChatExport\DailyBackup</code>，当前用户权限即可，一般无需管理员。</li>
-    <li>日志写在程序旁 <code>schedule\logs\</code>。</li>
+    <li>日志写在程序旁 <code>schedule\logs\</code>；「立即跑一次」可马上验证。</li>
     <li>建议备份时微信已关闭；定时任务默认 <code>--no-harvest</code>（不后台收割图片密钥）。</li>
     <li>密钥需事先提取并保存在本机配置中，否则解密阶段会跳过缺密钥的库。</li>
     <li>非 Windows 或不想自动注册时：点「仅生成模板」，再手动导入 XML。</li>
@@ -61,9 +76,11 @@
 </div>
 {% endblock %}
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/dbdir.js') }}"></script>
 <script>
 (function () {
   const esc = (s) => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
+  try { new DbDirPicker({ inputId: 'cfg-db-dir' }); } catch (e) {}
 
   function collect() {
     return {
@@ -112,6 +129,23 @@
         + ' · '
         + '<a href="/api/backup/schedule/download/xml">WeChatExport_DailyBackup.xml</a>';
     }
+
+    const logs = data.recent_logs || [];
+    const logEl = document.getElementById('log-list');
+    if (!logs.length) {
+      logEl.textContent = '暂无日志（跑过一次备份后会出现在 schedule\\logs\\）';
+    } else {
+      let html = '';
+      for (const L of logs) {
+        const when = L.mtime ? new Date(L.mtime * 1000).toLocaleString('zh-CN') : '';
+        html += '<div style="border-bottom:1px solid var(--px-border);padding:8px 0">';
+        html += '<b>' + esc(L.name) + '</b> <span style="opacity:.8">' + esc(when)
+          + ' · ' + esc(L.size) + ' B</span>';
+        if (L.tail) html += '<pre style="white-space:pre-wrap;margin:6px 0 0;font-size:11px">' + esc(L.tail) + '</pre>';
+        html += '</div>';
+      }
+      logEl.innerHTML = html;
+    }
   }
 
   async function refresh() {
@@ -155,6 +189,15 @@
       const data = await post('/api/backup/schedule/template', collect());
       await refresh();
       alert('模板已生成\n' + (data.bat_path || '') + '\n' + (data.xml_path || ''));
+    } catch (e) { alert(e.message || e); }
+  });
+  document.getElementById('btn-run-now').addEventListener('click', async () => {
+    try {
+      // Ensure bat exists with current settings
+      await post('/api/backup/schedule/template', collect());
+      const data = await post('/api/backup/schedule/run-now', collect());
+      await refresh();
+      alert(data.detail || '已触发');
     } catch (e) { alert(e.message || e); }
   });
 

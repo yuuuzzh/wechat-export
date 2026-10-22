@@ -350,9 +350,50 @@ def collect_messages(chat_info, start_ts=None, end_ts=None, keyword=None,
     return messages
 
 
+def _apply_privacy(messages, privacy, display=None):
+    """Apply privacy redaction; returns (messages, display, stats_or_None)."""
+    if not privacy:
+        return messages, display, None
+    from engine.services.privacy_redact import build_name_map, redact_messages
+    style = privacy.get('style') or 'placeholder'
+    nmap = None
+    if privacy.get('nicknames', True):
+        names = []
+        hints = {}
+        for m in messages:
+            for key in ('sender', 'chat_name'):
+                v = (m.get(key) or '').strip()
+                if not v:
+                    continue
+                names.append(v)
+                if key == 'chat_name':
+                    hints[v] = bool(m.get('is_group')) or str(
+                        m.get('chat_id') or ''
+                    ).endswith('@chatroom')
+        if display:
+            names.append(display)
+            hints.setdefault(
+                display,
+                any(hints.values()) or str(
+                    (messages[0].get('chat_id') if messages else '') or ''
+                ).endswith('@chatroom'),
+            )
+        nmap = build_name_map(names, style=style, group_hints=hints)
+    msgs, stats = redact_messages(
+        messages,
+        nicknames=bool(privacy.get('nicknames', True)),
+        phones=bool(privacy.get('phones', True)),
+        id_cards=bool(privacy.get('id_cards', True)),
+        style=style,
+        name_map=nmap,
+    )
+    new_display = (nmap.get(display, display) if (display and nmap) else display)
+    return msgs, new_display, stats
+
+
 def export_chat(chat_info, out_dir, start_ts=None, end_ts=None, keyword=None,
                 print_fn=None, progress_fn=None, fmt='txt', display_name=None,
-                include_asr=False, asr_lookup=None):
+                include_asr=False, asr_lookup=None, privacy=None):
     """导出单个聊天的消息记录。
 
     Returns: (msg_count, file_path)
@@ -370,16 +411,28 @@ def export_chat(chat_info, out_dir, start_ts=None, end_ts=None, keyword=None,
     if not messages:
         return 0, None
 
+    messages, display, priv_stats = _apply_privacy(messages, privacy, display)
+    if priv_stats and print_fn:
+        print_fn(
+            '隐私脱敏：映射昵称 %s，手机号 %s，身份证 %s'
+            % (priv_stats.get('names_mapped', 0),
+               priv_stats.get('phones', 0),
+               priv_stats.get('id_cards', 0))
+        )
+
     meta = {
         "display": display,
-        "uname": chat_info["username"],
+        "uname": chat_info["username"] if not privacy else "wxid_demo",
         "start_ts": start_ts,
         "end_ts": end_ts,
         "keyword": keyword or "",
         "exported_at": datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S"),
+        "privacy_redact": bool(privacy),
     }
 
     safe_name = re.sub(r'[<>:"/\\|?*]', '_', display)[:40] or 'chat'
+    if privacy:
+        safe_name = ('脱敏_' + safe_name)[:40]
     os.makedirs(out_dir, exist_ok=True)
     ext = _fmt_ext(fmt)
     out_path = os.path.join(out_dir, f"{safe_name}.{ext}")
@@ -390,7 +443,7 @@ def export_chat(chat_info, out_dir, start_ts=None, end_ts=None, keyword=None,
 
 def export_chats(chat_infos, out_dir, start_ts=None, end_ts=None, keyword=None,
                  print_fn=None, progress_fn=None, fmt='txt', include_asr=False,
-                 merge=True):
+                 merge=True, privacy=None):
     """导出多个会话。
 
     - xlsx/csv：默认合并为一个按时间平铺的文件（含「会话」列）
@@ -425,6 +478,15 @@ def export_chats(chat_infos, out_dir, start_ts=None, end_ts=None, keyword=None,
     if not all_msgs:
         return 0, None, details
 
+    all_msgs, _, priv_stats = _apply_privacy(all_msgs, privacy, None)
+    if priv_stats and print_fn:
+        print_fn(
+            '隐私脱敏：映射昵称 %s，手机号 %s，身份证 %s'
+            % (priv_stats.get('names_mapped', 0),
+               priv_stats.get('phones', 0),
+               priv_stats.get('id_cards', 0))
+        )
+
     all_msgs.sort(key=lambda m: (m["create_time"] or 0, m.get("local_id") or 0))
 
     stamp = datetime.now(TZ).strftime("%Y%m%d_%H%M%S")
@@ -433,15 +495,24 @@ def export_chats(chat_infos, out_dir, start_ts=None, end_ts=None, keyword=None,
         safe_kw = re.sub(r'[<>:"/\\|?*\s]+', '_', str(keyword))[:20]
         kw_tag = f"_kw_{safe_kw}"
 
+    if privacy:
+        meta_display = "多会话合并（已脱敏）" if len(chat_infos) > 1 else (
+            (all_msgs[0].get("chat_name") if all_msgs else None)
+            or "脱敏导出")
+        meta_uname = "wxid_demo"
+    else:
+        meta_display = "多会话合并" if len(chat_infos) > 1 else (
+            chat_infos[0].get("display_name") or chat_infos[0]["username"])
+        meta_uname = ",".join(c["username"] for c in chat_infos[:20])
     meta = {
-        "display": "多会话合并" if len(chat_infos) > 1 else (
-            chat_infos[0].get("display_name") or chat_infos[0]["username"]),
-        "uname": ",".join(c["username"] for c in chat_infos[:20]),
+        "display": meta_display,
+        "uname": meta_uname,
         "start_ts": start_ts,
         "end_ts": end_ts,
         "keyword": keyword or "",
         "exported_at": datetime.now(TZ).strftime("%Y-%m-%d %H:%M:%S"),
         "chat_count": len(chat_infos),
+        "privacy_redact": bool(privacy),
     }
 
     # 表格/结构化：默认按时间平铺合并；txt/html/md 可按 merge 合并
@@ -449,7 +520,8 @@ def export_chats(chat_infos, out_dir, start_ts=None, end_ts=None, keyword=None,
     text_fmts = ('txt', 'html', 'md')
     if fmt in merge_fmts or (merge and len(chat_infos) >= 1 and fmt in text_fmts):
         ext = _fmt_ext(fmt)
-        name = f"messages_{stamp}{kw_tag}.{ext}"
+        prefix = "messages_redacted_" if privacy else "messages_"
+        name = f"{prefix}{stamp}{kw_tag}.{ext}"
         out_path = os.path.join(out_dir, name)
         _write_by_fmt(fmt, out_path, all_msgs, meta)
         progress_fn(100, "完成")
@@ -463,7 +535,7 @@ def export_chats(chat_infos, out_dir, start_ts=None, end_ts=None, keyword=None,
         count, path = export_chat(
             chat, out_dir, start_ts=start_ts, end_ts=end_ts, keyword=keyword,
             print_fn=print_fn, fmt=fmt, display_name=display,
-            include_asr=include_asr)
+            include_asr=include_asr, privacy=privacy)
         new_details.append((display, count, path))
         if path:
             file_paths.append(path)

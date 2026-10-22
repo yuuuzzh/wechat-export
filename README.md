@@ -1,7 +1,7 @@
 ﻿# WeChat Export · 微信导出
 
 > **维护者**：yuuu · **仓库**：https://github.com/yuuuzzh/wechat-export  
-> **版本**：2.12.20261020（开发中，下一正式版计划为 `v0.2.0`）· **平台**：Windows 10/11 · **微信**：4.x（已测 4.1.9 / 4.1.10 / 4.1.12.55 / 4.1.15.11）  
+> **版本**：2.12.20261022（正式版 `v0.2.0`）· **平台**：Windows 10/11 · **微信**：4.x（已测 4.1.9 / 4.1.10 / 4.1.12.55 / 4.1.15.11）  
 > **定位**：本地完成微信聊天记录的**分析、搜索与多格式导出**（备份是前置步骤）
 
 数据默认不出本机 · 可执行文件名 `wechat_exp.exe`（兼容分享包与旧脚本）。界面主题可切换（像素风 / 青春风 / 科技风 / 动漫风 / 微信原始风 / QQ 复古风等，持续完善）。
@@ -153,7 +153,7 @@
 
 仪表盘 → **媒体完整性**：扫描当前备份中图片 / 视频 / 语音是否已落盘，列出缺失清单（可恢复 / 已丢失），并对可恢复项**一键补迁**（从微信源目录硬链/复制，或从上一版备份复用；语音从 `media_*.db` 的 VoiceInfo 提取）。
 
-仪表盘 → **定时备份**：一键注册 Windows 计划任务「每天增量」，或下载 `daily_backup.bat` / `WeChatExport_DailyBackup.xml` 自行导入。日志在程序旁 `schedule\logs\`。
+仪表盘 → **定时备份**：UI「每天增量」一键注册 Windows 计划任务（任务名 `WeChatExport\DailyBackup`），或只生成并下载 `daily_backup.bat` / `WeChatExport_DailyBackup.xml` 自行导入。「立即跑一次」可马上验证；最近日志在程序旁 `schedule\logs\`。
 
 找不到目录时可用「自动检测」「深度搜索」，或从微信「设置 → 文件管理 → 打开文件夹」粘贴 `db_storage` 路径。
 
@@ -180,7 +180,8 @@
 
 1. 筛选「全部 / 群聊 / 私聊」，搜索并**勾选**会话  
 2. 可选：关键词、日期范围  
-3. 选择格式后点 **开始导出**
+3. 可选勾选 **隐私脱敏导出**（昵称 → 联系人甲 / 示例群聊，或星号打码；正文手机号、身份证批量打码）— 仅改导出文件，备份库不变，方便分享演示  
+4. 选择格式后点 **开始导出**
 
 | 格式 | 用途 |
 |------|------|
@@ -422,27 +423,28 @@ python src/main.py voice-export --chat 家族群 --merge-by person --format mp3
 
 - **源码**：https://github.com/yuuuzzh/wechat-export  
 - **维护者**：yuuu  
-- **最新正式 Release**：https://github.com/yuuuzzh/wechat-export/releases/tag/v0.1.0  
-- **Windows 可执行文件**：https://github.com/yuuuzzh/wechat-export/releases/download/v0.1.0/WeChatExport-v0.1.0-windows-x64.exe  
+- **最新正式 Release**：https://github.com/yuuuzzh/wechat-export/releases/tag/v0.2.0  
+- **Windows 可执行文件**：https://github.com/yuuuzzh/wechat-export/releases/download/v0.2.0/WeChatExport-v0.2.0-windows-x64.exe  
 
 下载 exe 后双击即可；也可本地执行 `quick_build.bat` / `build.bat` 自行打包。分享包目录：`share_package/`（模板与说明）。
 
-### 8.1 下一正式版 `v0.2.0`（草稿，未打 tag）
+### 8.1 `v0.2.0`（2026-10-22）
 
-主线已合入、待完整功能收齐后再打 `v0.2.0` 并上传 exe。相对 `v0.1.0` 已包含或进行中的方向：
+相对 `v0.1.0` 的主要变化：
 
 | 方向 | 内容 |
 |------|------|
-| 归档可靠性 | 备份版本对比 / 回滚 /「这次多了哪些会话」；媒体完整性体检与一键补迁；Windows「每天增量」计划任务（bat/xml 模板） |
+| 归档可靠性 | 备份版本对比 / 回滚 /「这次多了哪些会话」；媒体完整性体检与一键补迁 |
+| 定时备份 | UI「每天增量」：Windows 计划任务 + bat/xml 模板、「立即跑一次」、日志预览 |
+| 隐私脱敏 | 导出前批量打码昵称 / 手机号 / 身份证，便于分享演示（不改备份库） |
 | 专项导出 | 收藏（`favorite.db`，密钥覆盖时）· 文件传输助手 |
-| 对接 | 从已注册 `/api/*` 自动生成 OpenAPI（`/api/openapi.json`）与 Swagger 页（`/swagger`） |
-| 其它 | 增量备份、朋友圈离线浏览与导出、产品定位与文档整理 |
+| 对接 | OpenAPI（`/api/openapi.json`）与 Swagger（`/swagger`） |
+| 其它 | 增量备份、朋友圈离线浏览与导出、文档与主题整理 |
 
-> 发新版时请同步：构建产物、Release / tag、本节版本说明。  
 > `build.bat` 可能改写 `wechat_exp.spec`，构建后请还原仓库中的手工维护版本。
 
 反馈时请附带：程序界面或控制台截图、微信版本、Windows 版本（`winver`）。
 
 ---
 
-**最后更新**：2026-10-20 · WeChat Export by yuuu · 最新正式 tag `v0.1.0`
+**最后更新**：2026-10-22 · WeChat Export by yuuu · 最新正式 tag `v0.2.0`

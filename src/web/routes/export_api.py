@@ -281,6 +281,8 @@ def export_chat():
       format: txt | html | xlsx | csv | md | json | pgsql | chatlab-jsonl | chatlab-json
       merge: 多会话 txt/html 是否合并（xlsx/csv 始终合并）
       include_asr: 是否带上已转写语音文字
+      privacy_redact: 导出前脱敏昵称/手机号/身份证（分享演示）
+      privacy: {nicknames, phones, id_cards, style: placeholder|asterisk}
     """
     data = request.get_json(silent=True) or {}
     contact = data.get('contact', '') or ''
@@ -293,6 +295,8 @@ def export_chat():
     merge = data.get('merge')
     if merge is None:
         merge = fmt in ('xlsx', 'csv', 'html', 'json', 'pgsql', 'sql')
+    from engine.services.privacy_redact import parse_privacy_options
+    privacy = parse_privacy_options(data)
 
     decrypted_dir = _decrypted_dir()
     # 注意：后台线程没有 Flask 应用上下文，配置必须在此处（请求线程内）取出
@@ -391,7 +395,8 @@ def export_chat():
                             keyword=keyword or None,
                             print_fn=_print, fmt='html',
                             display_name=raw_name,
-                            include_asr=bool(data.get('include_asr')))
+                            include_asr=bool(data.get('include_asr')),
+                            privacy=privacy)
                         total_msgs += count or 0
                         if chat_path and os.path.isfile(chat_path):
                             dest = os.path.join(work, 'chat.html')
@@ -530,14 +535,16 @@ def export_chat():
                     start_ts=start_ts, end_ts=end_ts, keyword=keyword or None,
                     print_fn=_print, fmt=fmt,
                     display_name=display_name_hint or targets[0].get('display_name'),
-                    include_asr=bool(data.get('include_asr')))
+                    include_asr=bool(data.get('include_asr')),
+                    privacy=privacy)
             else:
                 count, filepath, _details = export_chats(
                     targets, out_dir,
                     start_ts=start_ts, end_ts=end_ts, keyword=keyword or None,
                     print_fn=_print, progress_fn=_progress, fmt=fmt,
                     include_asr=bool(data.get('include_asr')),
-                    merge=bool(merge))
+                    merge=bool(merge),
+                    privacy=privacy)
 
             if count and filepath:
                 fname = os.path.basename(filepath)
@@ -546,6 +553,8 @@ def export_chat():
                     note = '已按关键词过滤：%s' % keyword
                 if len(targets) > 1 and fmt in ('xlsx', 'csv', 'html', 'json', 'pgsql', 'sql', 'md', 'markdown'):
                     note = (note + '；' if note else '') + '多会话已按时间平铺合并'
+                if privacy:
+                    note = (note + '；' if note else '') + '已启用隐私脱敏（昵称/手机号/身份证）'
                 push.done({'msg_count': count,
                            'download_url': '/api/export/download/' + fname,
                            'filename': fname,

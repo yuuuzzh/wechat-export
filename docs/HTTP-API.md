@@ -48,7 +48,7 @@ Host: 127.0.0.1:5000
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/export/chats?kind=all\|group\|contact&q=` | 可选会话列表（含消息数） |
-| POST | `/api/export/chat` | 导出会话（SSE） |
+| POST | `/api/export/chat` | 导出会话（SSE）；可选 `privacy_redact` + `privacy` 脱敏昵称/手机/身份证 |
 | GET | `/api/export/download/<filename>` | 下载导出文件 |
 | POST | `/api/export/wordcloud` | 词云 |
 | POST | `/api/export/report` | 综合 HTML 报告 |
@@ -66,11 +66,20 @@ Host: 127.0.0.1:5000
   "date_start": "2026-01-01",
   "date_end": "2026-12-31",
   "merge": true,
-  "include_asr": false
+  "include_asr": false,
+  "privacy_redact": true,
+  "privacy": {
+    "nicknames": true,
+    "phones": true,
+    "id_cards": true,
+    "style": "placeholder"
+  }
 }
 ```
 
 `format` 支持：`txt` · `html` · `xlsx` · `csv` · `md` · `json` · `pgsql` · `session-pack` · `chatlab-jsonl` · `chatlab-json`。
+
+**隐私脱敏**（`privacy_redact: true`）：仅改写导出文件，不修改本机备份。昵称可映射为「联系人甲 / 示例群聊」（`style: placeholder`）或星号打码（`asterisk`）；正文中的大陆手机号、15/18 位身份证号批量打码。文件名会加 `脱敏_` 前缀。
 
 ---
 
@@ -97,10 +106,11 @@ Host: 127.0.0.1:5000
 | GET | `/api/backup/versions` | 列出备份版本（`base_dir` / `wxid` / `limit` 可选） |
 | GET/POST | `/api/backup/versions/diff` | 对比两版：`old` + `new` 路径 → 新增/消失会话与消息增量 |
 | POST | `/api/backup/versions/activate` | 将工作集切换到指定备份（回滚），body: `{ "path": "..." }` |
-| GET | `/api/backup/schedule/status` | 定时备份状态（计划任务 / 模板路径 / 命令预览） |
+| GET | `/api/backup/schedule/status` | 定时备份状态（计划任务 / 模板路径 / 命令预览 / 最近日志） |
 | POST | `/api/backup/schedule/install` | 启用每天增量：`{ "time":"02:00", "days":0, "db_dir":"..." }` |
 | POST | `/api/backup/schedule/uninstall` | 停用计划任务 |
 | GET/POST | `/api/backup/schedule/template` | 仅生成 bat/xml，不注册 |
+| POST | `/api/backup/schedule/run-now` | 立即触发一次（已安装则 `schtasks /Run`，否则后台跑 bat） |
 | GET | `/api/backup/schedule/download/bat\|xml` | 下载模板 |
 | GET/POST | `/api/media/integrity` | 媒体完整性体检：缺失图片/视频/语音清单（可恢复 / 已丢失） |
 | POST | `/api/media/integrity/remigrate` | 一键补迁可恢复项（SSE） |

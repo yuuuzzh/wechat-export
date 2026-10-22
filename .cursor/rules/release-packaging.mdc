@@ -1,0 +1,21 @@
+---
+description: When cutting a WeChat Export release/tag, build the Windows exe and upload it without asking the user to operate.
+alwaysApply: true
+---
+
+# Release packaging (always do it yourself)
+
+When the user asks to cut a version / tag / Release for this repo (`pc_wechat_exp` / wechat-export):
+
+1. Bump `src/engine/version.py` (`MINOR` as needed) and `file_version_info.txt`; update README download links and changelog.
+2. Commit (author **yuuu** / `yuuu@users.noreply.github.com` via env, never `git config`), push `main`, create annotated tag, push tag.
+3. Ensure `gh` is authenticated (`gh auth status`); if not, run `gh auth login --web` and complete the flow.
+4. Create the GitHub Release for the tag if missing (`gh release create`).
+5. **Build the Windows one-file exe yourself** (do not ask the user to package):
+   - Use PyInstaller one-file console build of `src/main.py` with `--version-file file_version_info.txt`, datas for `src`, `README.md`, `docs/HTTP-API.md`, `tools/silk_decoder.exe`.
+   - Output `dist/wechat_exp.exe`, then copy to `dist/WeChatExport-<tag>-windows-x64.exe` (e.g. `WeChatExport-v0.2.0-windows-x64.exe`).
+   - Avoid scripts that end with `pause`; restore `wechat_exp.spec` with `git checkout -- wechat_exp.spec` if the build rewrote it.
+6. Upload: `gh release upload <tag> dist/WeChatExport-<tag>-windows-x64.exe --clobber`.
+7. Confirm the asset URL matches README.
+
+Do not leave a Release without the exe when a Windows build is feasible on this machine.

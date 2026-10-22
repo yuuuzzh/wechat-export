@@ -104,6 +104,18 @@ def schedule_template():
     })
 
 
+@schedule_bp.route('/run-now', methods=['POST'])
+def schedule_run_now():
+    """POST — trigger the daily backup task / bat immediately."""
+    from backup.schedule import run_task_now, load_schedule_settings
+    data = request.get_json(silent=True) or {}
+    settings = load_schedule_settings()
+    name = (data.get('task_name') or settings.get('task_name') or '').strip() or None
+    result = run_task_now(name)
+    status = 200 if result.get('ok') else 500
+    return jsonify(result), status
+
+
 @schedule_bp.route('/download/<kind>', methods=['GET'])
 def schedule_download(kind: str):
     from backup.schedule import schedule_root, write_runner_bat, write_task_xml, load_schedule_settings
