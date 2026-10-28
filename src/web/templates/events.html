@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}话题 / 事件时间线 — WeChat Export{% endblock %}
+{% block content %}
+<a href="/" class="back-link">← 返回仪表盘</a>
+<h2 style="margin:0 0 4px 0">话题 / 事件时间线</h2>
+<p style="color:var(--px-muted);font-size:12px;margin:0 0 20px 0">
+  按关键词检索消息，再按时间间隔聚类成「事件卡片」。适合回顾旅行、搬家、项目节点等话题脉络。
+  依赖全局搜索索引（未构建时会自动降级扫描）。
+</p>
+
+<div class="config-panel">
+  <div class="form-row">
+    <div style="flex:3">
+      <label>关键词（逗号 / 换行分隔，最多 20 个）</label>
+      <textarea id="cfg-keywords" rows="3" placeholder="例如：搬家, 旅游, 婚礼&#10;或：服务器 宕机"></textarea>
+    </div>
+  </div>
+  <div class="form-row" style="margin-top:8px">
+    <div style="flex:1"><label>起始日期</label><input type="date" id="cfg-start"></div>
+    <div style="flex:1"><label>截止日期</label><input type="date" id="cfg-end"></div>
+    <div style="flex:1">
+      <label>聚类间隔（小时）</label>
+      <input type="number" id="cfg-gap" value="72" min="1" max="1440" step="1"
+             title="同一关键词下，相邻命中间隔超过此值则拆成新事件">
+    </div>
+    <div style="flex:2">
+      <label>限定会话（可选）</label>
+      <input id="cfg-chat" placeholder="群名 / 联系人 / wxid，留空=全部">
+    </div>
+  </div>
+  <label class="check-row" style="margin-top:10px"
+         title="时间重叠且同会话/同消息的不同关键词卡片会合并">
+    <input type="checkbox" id="cfg-merge" checked>
+    <span>合并相关话题卡片</span>
+  </label>
+  <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+    <button id="btn-run" class="btn btn-primary">生成时间线</button>
+    <a href="/search" class="btn btn-secondary" style="text-decoration:none;display:inline-flex;align-items:center">打开全局搜索</a>
+  </div>
+  <div id="status-line" style="margin-top:10px;font-size:12px;color:var(--px-muted);line-height:1.6"></div>
+</div>
+
+<div id="summary-panel" class="config-panel" style="margin-top:16px;display:none">
+  <h3 style="margin:0 0 8px;font-size:15px">摘要</h3>
+  <div id="summary-text" style="font-size:12px;color:var(--px-muted);line-height:1.7"></div>
+</div>
+
+<div id="timeline" style="margin-top:20px"></div>
+{% endblock %}
+{% block scripts %}
+<style>
+.ev-tl { position: relative; padding-left: 22px; }
+.ev-tl::before {
+  content: '';
+  position: absolute; left: 7px; top: 8px; bottom: 8px;
+  width: 2px; background: var(--px-border);
+}
+.ev-card {
+  position: relative;
+  margin: 0 0 16px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--px-border);
+  background: var(--px-panel, var(--px-input-bg));
+}
+.ev-card::before {
+  content: '';
+  position: absolute; left: -19px; top: 18px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--px-accent, #3d9b72);
+  border: 2px solid var(--px-bg, #0a1612);
+}
+.ev-title { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
+.ev-meta { font-size: 12px; color: var(--px-muted); line-height: 1.7; }
+.ev-tags { margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.ev-tag {
+  font-size: 11px; padding: 2px 8px;
+  border: 1px solid var(--px-border); color: var(--px-muted);
+}
+.ev-samples { margin: 10px 0 0; padding: 0; list-style: none; }
+.ev-samples li {
+  font-size: 12px; padding: 8px 0;
+  border-top: 1px solid var(--px-border); line-height: 1.55;
+}
+.ev-samples .who { color: var(--px-muted); }
+.ev-empty { color: var(--px-muted); font-size: 13px; padding: 24px 0; }
+</style>
+<script>
+(function () {
+  const esc = (s) => {
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  };
+
+  function collect() {
+    return {
+      keywords: document.getElementById('cfg-keywords').value,
+      date_start: document.getElementById('cfg-start').value,
+      date_end: document.getElementById('cfg-end').value,
+      gap_hours: parseFloat(document.getElementById('cfg-gap').value) || 72,
+      chat: document.getElementById('cfg-chat').value.trim(),
+      merge_related: document.getElementById('cfg-merge').checked,
+    };
+  }
+
+  function render(data) {
+    const sum = document.getElementById('summary-panel');
+    const sumText = document.getElementById('summary-text');
+    const tl = document.getElementById('timeline');
+    const st = data.stats || {};
+    sum.style.display = 'block';
+    let html = '关键词 <b>' + esc(st.keyword_count) + '</b> 个 · 命中 <b>'
+      + esc(st.hit_count) + '</b> 条 · 事件卡片 <b>' + esc(st.event_count) + '</b> 张'
+      + ' · 聚类间隔 ' + esc(data.gap_hours) + ' 小时';
+    if ((data.warnings || []).length) {
+      html += '<br>提示：' + (data.warnings || []).map(esc).join('；');
+    }
+    if ((data.errors || []).length) {
+      html += '<br>部分关键词失败：'
+        + data.errors.map(e => esc((e.keyword || '') + ' — ' + (e.error || ''))).join('；');
+    }
+    sumText.innerHTML = html;
+
+    const events = data.events || [];
+    if (!events.length) {
+      tl.innerHTML = '<div class="ev-empty">没有聚成事件。可换关键词、放宽日期，或先到「全局搜索」确认能搜到消息。</div>';
+      return;
+    }
+
+    let out = '<div class="ev-tl">';
+    for (const ev of events) {
+      out += '<article class="ev-card">';
+      out += '<div class="ev-title">' + esc(ev.title) + '</div>';
+      out += '<div class="ev-meta">'
+        + esc(ev.start_label || '—') + ' → ' + esc(ev.end_label || '—')
+        + (ev.span_days ? '（跨 ' + esc(ev.span_days) + ' 天）' : '')
+        + '<br>消息 ' + esc(ev.message_count)
+        + ' · 会话 ' + esc(ev.chat_count)
+        + (ev.peak_day ? ' · 高峰日 ' + esc(ev.peak_day) + '（' + esc(ev.peak_day_count) + '）' : '')
+        + '</div>';
+      out += '<div class="ev-tags">';
+      for (const k of (ev.keywords || [])) {
+        out += '<span class="ev-tag">' + esc(k) + '</span>';
+      }
+      for (const c of (ev.chats || []).slice(0, 5)) {
+        out += '<span class="ev-tag">' + esc(c.display_name) + ' ×' + esc(c.count) + '</span>';
+      }
+      out += '</div>';
+      if ((ev.samples || []).length) {
+        out += '<ul class="ev-samples">';
+        for (const s of ev.samples) {
+          out += '<li><span class="who">' + esc(s.time_label) + ' · '
+            + esc(s.chat_display_name) + ' · ' + esc(s.sender_display_name)
+            + '</span><br>' + esc(s.snippet) + '</li>';
+        }
+        out += '</ul>';
+      }
+      out += '</article>';
+    }
+    out += '</div>';
+    tl.innerHTML = out;
+  }
+
+  document.getElementById('btn-run').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-run');
+    const status = document.getElementById('status-line');
+    const body = collect();
+    if (!(body.keywords || '').trim()) {
+      alert('请填写至少一个关键词');
+      return;
+    }
+    btn.disabled = true;
+    status.textContent = '正在检索并聚类…（关键词多或未建索引时可能较慢）';
+    try {
+      const res = await fetch('/api/events/timeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        status.textContent = data.error || '生成失败';
+        document.getElementById('timeline').innerHTML = '';
+        document.getElementById('summary-panel').style.display = 'none';
+        return;
+      }
+      status.textContent = '完成';
+      render(data);
+    } catch (e) {
+      status.textContent = '请求失败: ' + (e.message || e);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
+{% endblock %}

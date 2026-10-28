@@ -239,6 +239,12 @@ def create_app(decrypted_dir: str, wxid: str = None, db_dir: str = None) -> Flas
 
     _register_blueprint(app, 'routes.specials_api', _register_specials_bp)
 
+    def _register_events_bp():
+        from .routes.events_api import events_bp
+        app.register_blueprint(events_bp)
+
+    _register_blueprint(app, 'routes.events_api', _register_events_bp)
+
     # New: 语音导出 API（按人批量导出语音留言）
     def _register_voice_export_bp():
         from .routes.voice_export_api import voice_export_bp
@@ -414,6 +420,10 @@ def create_app(decrypted_dir: str, wxid: str = None, db_dir: str = None) -> Flas
     @app.route('/specials')
     def specials_page():
         return render_template('specials.html')
+
+    @app.route('/events')
+    def events_page():
+        return render_template('events.html')
 
     @app.route('/manual')
     @app.route('/docs')
