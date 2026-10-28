@@ -46,6 +46,8 @@ def test_cluster_by_gap_and_card():
     assert card['message_count'] == 2
     assert card['chat_count'] == 1
     assert card['samples']
+    assert card['search_href'].startswith('/search?q=')
+    assert card['samples'][0]['chat_href'].startswith('/chat?open=')
 
 
 def test_build_timeline_mocked(monkeypatch, tmp_path):

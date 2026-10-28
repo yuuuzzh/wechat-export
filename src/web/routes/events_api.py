@@ -18,6 +18,7 @@ def events_timeline():
     Body / query:
       keywords | q: str (comma / newline separated)
       gap_hours: float (default 72)
+      min_messages: int (default 1) — drop clusters smaller than this
       date_start, date_end: YYYY-MM-DD
       chat: optional session filter
       max_per_keyword: int
@@ -61,6 +62,7 @@ def events_timeline():
         _decrypted(),
         keywords,
         gap_hours=_num('gap_hours', 72),
+        min_messages=int(_num('min_messages', 1)),
         date_start=(data.get('date_start') or args.get('date_start') or '').strip() or None,
         date_end=(data.get('date_end') or args.get('date_end') or '').strip() or None,
         chat=(data.get('chat') or args.get('chat') or '').strip() or None,

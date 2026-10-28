@@ -23,6 +23,11 @@
       <input type="number" id="cfg-gap" value="72" min="1" max="1440" step="1"
              title="同一关键词下，相邻命中间隔超过此值则拆成新事件">
     </div>
+    <div style="flex:1">
+      <label>最少消息数</label>
+      <input type="number" id="cfg-min" value="1" min="1" max="100" step="1"
+             title="小于该条数的簇不生成卡片">
+    </div>
     <div style="flex:2">
       <label>限定会话（可选）</label>
       <input id="cfg-chat" placeholder="群名 / 联系人 / wxid，留空=全部">
@@ -98,6 +103,7 @@
       date_start: document.getElementById('cfg-start').value,
       date_end: document.getElementById('cfg-end').value,
       gap_hours: parseFloat(document.getElementById('cfg-gap').value) || 72,
+      min_messages: parseInt(document.getElementById('cfg-min').value, 10) || 1,
       chat: document.getElementById('cfg-chat').value.trim(),
       merge_related: document.getElementById('cfg-merge').checked,
     };
@@ -130,7 +136,11 @@
     let out = '<div class="ev-tl">';
     for (const ev of events) {
       out += '<article class="ev-card">';
-      out += '<div class="ev-title">' + esc(ev.title) + '</div>';
+      out += '<div class="ev-title">' + esc(ev.title);
+      if (ev.search_href) {
+        out += ' <a href="' + esc(ev.search_href) + '" style="font-size:12px;font-weight:normal">在搜索中打开</a>';
+      }
+      out += '</div>';
       out += '<div class="ev-meta">'
         + esc(ev.start_label || '—') + ' → ' + esc(ev.end_label || '—')
         + (ev.span_days ? '（跨 ' + esc(ev.span_days) + ' 天）' : '')
@@ -143,15 +153,25 @@
         out += '<span class="ev-tag">' + esc(k) + '</span>';
       }
       for (const c of (ev.chats || []).slice(0, 5)) {
-        out += '<span class="ev-tag">' + esc(c.display_name) + ' ×' + esc(c.count) + '</span>';
+        const href = c.chat_id ? ('/chat?open=' + encodeURIComponent(c.chat_id)) : '';
+        if (href) {
+          out += '<a class="ev-tag" href="' + esc(href) + '">' + esc(c.display_name) + ' ×' + esc(c.count) + '</a>';
+        } else {
+          out += '<span class="ev-tag">' + esc(c.display_name) + ' ×' + esc(c.count) + '</span>';
+        }
       }
       out += '</div>';
       if ((ev.samples || []).length) {
         out += '<ul class="ev-samples">';
         for (const s of ev.samples) {
-          out += '<li><span class="who">' + esc(s.time_label) + ' · '
-            + esc(s.chat_display_name) + ' · ' + esc(s.sender_display_name)
-            + '</span><br>' + esc(s.snippet) + '</li>';
+          const who = esc(s.time_label) + ' · ' + esc(s.chat_display_name) + ' · ' + esc(s.sender_display_name);
+          out += '<li><span class="who">';
+          if (s.chat_href) {
+            out += '<a href="' + esc(s.chat_href) + '">' + who + '</a>';
+          } else {
+            out += who;
+          }
+          out += '</span><br>' + esc(s.snippet) + '</li>';
         }
         out += '</ul>';
       }

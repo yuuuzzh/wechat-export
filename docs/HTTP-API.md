@@ -55,6 +55,7 @@ Host: 127.0.0.1:5000
 {
   "keywords": "搬家, 旅游",
   "gap_hours": 72,
+  "min_messages": 1,
   "date_start": "2024-01-01",
   "date_end": "2024-12-31",
   "chat": "",
@@ -62,7 +63,7 @@ Host: 127.0.0.1:5000
 }
 ```
 
-返回 `events[]`：每张卡片含 `title` / `keywords` / 起止时间 / 会话与样例摘录。页面入口：`/events`。
+返回 `events[]`：每张卡片含 `title` / `keywords` / 起止时间 / 会话与样例摘录，以及 `search_href`（跳转全局搜索）、样例里的 `chat_href`（定位到聊天查看器）。页面入口：`/events`。
 
 ---
 

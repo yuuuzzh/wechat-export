@@ -15,6 +15,7 @@ from engine.services.search import SearchIndexError, search_messages
 
 DEFAULT_GAP_HOURS = 72
 DEFAULT_MAX_PER_KEYWORD = 3000
+DEFAULT_MIN_MESSAGES = 1
 MAX_SAMPLES = 5
 MAX_CHATS_SHOWN = 8
 MAX_KEYWORDS = 20
@@ -95,6 +96,11 @@ def _cluster_by_gap(hits: list[dict[str, Any]], gap_seconds: int) -> list[list[d
     return clusters
 
 
+def _url_quote(value: str) -> str:
+    from urllib.parse import quote
+    return quote(str(value or ''), safe='')
+
+
 def _fmt_ts(ts: Optional[int]) -> str:
     if not ts:
         return ''
@@ -165,14 +171,26 @@ def make_event_card(
     step = max(1, len(cluster) // MAX_SAMPLES)
     for i in range(0, len(cluster), step):
         h = cluster[i]
+        cid = h.get('chat_id') or ''
+        lid = h.get('local_id')
+        cts = h.get('create_time')
+        chat_href = ''
+        if cid:
+            chat_href = '/chat?open=' + _url_quote(cid)
+            if lid is not None and cts:
+                chat_href += (
+                    '&focus=' + _url_quote(str(int(lid)))
+                    + '&ft=' + _url_quote(str(int(cts)))
+                )
         samples.append({
-            'create_time': h.get('create_time'),
-            'time_label': _fmt_ts(h.get('create_time')),
-            'chat_display_name': h.get('chat_display_name') or h.get('chat_id'),
+            'create_time': cts,
+            'time_label': _fmt_ts(cts),
+            'chat_display_name': h.get('chat_display_name') or cid,
             'sender_display_name': h.get('sender_display_name') or h.get('sender_username'),
             'snippet': h.get('snippet') or '',
-            'chat_id': h.get('chat_id'),
-            'local_id': h.get('local_id'),
+            'chat_id': cid,
+            'local_id': lid,
+            'chat_href': chat_href,
         })
         if len(samples) >= MAX_SAMPLES:
             break
@@ -185,6 +203,13 @@ def make_event_card(
     span_days = 0
     if start_ts and end_ts:
         span_days = max(0, (end_ts - start_ts) // 86400)
+
+    # Re-runnable search query for this card (keyword + date window)
+    day0 = _fmt_day(start_ts) or ''
+    day1 = _fmt_day(end_ts) or day0
+    search_q = keyword
+    if day0 and day1:
+        search_q = f'{keyword} 日期:{day0}..{day1}'
 
     return {
         'id': _card_id(keyword, start_ts, end_ts, len(cluster)),
@@ -202,6 +227,8 @@ def make_event_card(
         'peak_day': peak_day,
         'peak_day_count': peak_day_count,
         'samples': samples,
+        'search_query': search_q,
+        'search_href': '/search?q=' + _url_quote(search_q) if search_q else '/search',
     }
 
 
@@ -313,6 +340,7 @@ def build_event_timeline(
     date_end: Optional[str] = None,
     chat: Optional[str] = None,
     max_per_keyword: int = DEFAULT_MAX_PER_KEYWORD,
+    min_messages: int = DEFAULT_MIN_MESSAGES,
     merge_related: bool = True,
     own_wxid: Optional[str] = None,
 ) -> dict[str, Any]:
@@ -346,6 +374,12 @@ def build_event_timeline(
     except (TypeError, ValueError):
         max_per_keyword = DEFAULT_MAX_PER_KEYWORD
     max_per_keyword = max(50, min(max_per_keyword, 20000))
+
+    try:
+        min_messages = int(min_messages)
+    except (TypeError, ValueError):
+        min_messages = DEFAULT_MIN_MESSAGES
+    min_messages = max(1, min(min_messages, 1000))
 
     cards: list[dict[str, Any]] = []
     hit_sets: list[set] = []
@@ -394,13 +428,21 @@ def build_event_timeline(
                 % (kw, body.get('total'), body.get('retained_rows'))
             )
 
+        dropped_small = 0
         for cluster in _cluster_by_gap(hits, gap_seconds):
+            if len(cluster) < min_messages:
+                dropped_small += 1
+                continue
             card = make_event_card(kw, cluster)
             cards.append(card)
             hit_sets.append({_hit_key(h) for h in cluster})
+        if dropped_small:
+            per_kw[-1]['dropped_small_clusters'] = dropped_small
 
     if merge_related and cards:
         cards = _merge_cards(cards, hit_sets)
+        # Re-apply min after merge (merged counts are sums)
+        cards = [c for c in cards if (c.get('message_count') or 0) >= min_messages]
 
     cards.sort(key=lambda c: (c.get('start_ts') or 0, c.get('title') or ''), reverse=True)
 
@@ -409,6 +451,7 @@ def build_event_timeline(
         'events': cards,
         'keywords': keywords,
         'gap_hours': gap_hours,
+        'min_messages': min_messages,
         'date_start': date_start or '',
         'date_end': date_end or '',
         'chat': chat or '',
