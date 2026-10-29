@@ -67,6 +67,18 @@ Host: 127.0.0.1:5000
 
 ---
 
+## 关系图谱
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET/POST | `/api/graph/relation` | 好友/群互动强度图谱（只读） |
+
+参数：`kind=all|friends|groups` · `top_n` · `min_messages` · `date_start` / `date_end`（需搜索索引）· `include_members`。
+
+返回 ECharts 可用的 `nodes` / `links` / `categories`，以及 `ranking` 排行。页面入口：`/graph`。
+
+---
+
 ## 导出
 
 | 方法 | 路径 | 说明 |

@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}关系图谱 — WeChat Export{% endblock %}
+{% block content %}
+<a href="/" class="back-link">← 返回仪表盘</a>
+<h2 style="margin:0 0 4px 0">关系图谱</h2>
+<p style="color:var(--px-muted);font-size:12px;margin:0 0 20px 0">
+  以「我」为中心，按消息量可视化好友 / 群聊互动强度（只读）。节点越大、连线越粗 = 互动越多。
+  按日期过滤需先构建<a href="/search">全局搜索索引</a>。
+</p>
+
+<div class="config-panel">
+  <div class="form-row">
+    <div style="flex:1">
+      <label>范围</label>
+      <select id="cfg-kind">
+        <option value="all" selected>好友 + 群聊</option>
+        <option value="friends">仅好友</option>
+        <option value="groups">仅群聊</option>
+      </select>
+    </div>
+    <div style="flex:1">
+      <label>显示 Top N</label>
+      <input type="number" id="cfg-top" value="40" min="5" max="200" step="1">
+    </div>
+    <div style="flex:1">
+      <label>最少消息数</label>
+      <input type="number" id="cfg-min" value="3" min="1" max="10000" step="1">
+    </div>
+    <div style="flex:1"><label>起始日期</label><input type="date" id="cfg-start"></div>
+    <div style="flex:1"><label>截止日期</label><input type="date" id="cfg-end"></div>
+  </div>
+  <label class="check-row" style="margin-top:10px"
+         title="在 Top 群里挂上发言最多的成员（虚线），需要搜索索引">
+    <input type="checkbox" id="cfg-members">
+    <span>显示群内活跃成员（需搜索索引）</span>
+  </label>
+  <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+    <button id="btn-run" class="btn btn-primary">生成图谱</button>
+    <button id="btn-reset" class="btn btn-secondary">复位视角</button>
+  </div>
+  <div id="status-line" style="margin-top:10px;font-size:12px;color:var(--px-muted);line-height:1.6"></div>
+</div>
+
+<div style="display:flex;gap:16px;margin-top:16px;flex-wrap:wrap;align-items:stretch">
+  <div class="config-panel" style="flex:3;min-width:280px;min-height:520px;padding:0;overflow:hidden">
+    <div id="chart" style="width:100%;height:520px"></div>
+  </div>
+  <div class="config-panel" style="flex:1;min-width:220px;max-height:520px;overflow:auto">
+    <h3 style="margin:0 0 8px;font-size:14px">互动排行</h3>
+    <div id="rank-list" style="font-size:12px;color:var(--px-muted)">点击「生成图谱」</div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
+<script>
+(function () {
+  const esc = (s) => {
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  };
+  const chart = echarts.init(document.getElementById('chart'));
+  let lastOption = null;
+
+  function collect() {
+    return {
+      kind: document.getElementById('cfg-kind').value,
+      top_n: parseInt(document.getElementById('cfg-top').value, 10) || 40,
+      min_messages: parseInt(document.getElementById('cfg-min').value, 10) || 3,
+      date_start: document.getElementById('cfg-start').value,
+      date_end: document.getElementById('cfg-end').value,
+      include_members: document.getElementById('cfg-members').checked,
+    };
+  }
+
+  function renderRank(ranking) {
+    const el = document.getElementById('rank-list');
+    if (!ranking || !ranking.length) {
+      el.textContent = '无数据';
+      return;
+    }
+    let html = '';
+    ranking.forEach((r, i) => {
+      const tag = r.is_group ? '群' : '友';
+      html += '<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--px-border)">';
+      html += '<span><b style="opacity:.6">' + (i + 1) + '.</b> '
+        + '<a href="' + esc(r.href || ('/chat?open=' + encodeURIComponent(r.id))) + '">'
+        + esc(r.name) + '</a>'
+        + ' <span style="opacity:.7">[' + tag + ']</span></span>';
+      html += '<span>' + esc(r.msg_count) + '</span></div>';
+    });
+    el.innerHTML = html;
+  }
+
+  function renderChart(data) {
+    const cats = (data.categories || []).map(c => ({ name: c.name }));
+    const option = {
+      tooltip: {
+        formatter: function (p) {
+          if (p.dataType === 'edge') {
+            return (p.data.value || 0) + ' 条消息';
+          }
+          const d = p.data || {};
+          if (d.id === '__self__') return '我（中心）';
+          return (d.name || '') + '<br/>消息 ' + (d.value || 0)
+            + (d.is_group ? ' · 群聊' : '');
+        },
+      },
+      legend: [{ data: cats.map(c => c.name), bottom: 0, textStyle: { color: '#8fb9a6', fontSize: 11 } }],
+      series: [{
+        type: 'graph',
+        layout: 'force',
+        roam: true,
+        draggable: true,
+        categories: cats,
+        data: data.nodes || [],
+        links: data.links || [],
+        label: {
+          show: true,
+          position: 'right',
+          formatter: '{b}',
+          fontSize: 11,
+          color: '#cfe8dc',
+        },
+        force: {
+          repulsion: 180,
+          edgeLength: [40, 160],
+          gravity: 0.08,
+        },
+        lineStyle: { color: 'source', curveness: 0.08, opacity: 0.65 },
+        emphasis: { focus: 'adjacency', lineStyle: { width: 4 } },
+      }],
+    };
+    lastOption = option;
+    chart.setOption(option, true);
+  }
+
+  chart.on('click', function (p) {
+    if (p.dataType !== 'node') return;
+    const d = p.data || {};
+    if (d.href) window.location.href = d.href;
+  });
+
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    if (lastOption) chart.setOption(lastOption, true);
+  });
+
+  document.getElementById('btn-run').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-run');
+    const status = document.getElementById('status-line');
+    btn.disabled = true;
+    status.textContent = '正在统计互动强度…';
+    try {
+      const res = await fetch('/api/graph/relation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(collect()),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        status.textContent = data.error || '生成失败';
+        chart.clear();
+        document.getElementById('rank-list').textContent = '无数据';
+        return;
+      }
+      const st = data.stats || {};
+      let msg = '展示 Top ' + esc(st.shown) + ' / 符合条件 '
+        + esc(st.matching) + ' · 数据源 ' + esc(st.source);
+      if ((data.warnings || []).length) {
+        msg += ' · ' + data.warnings.map(esc).join('；');
+      }
+      status.innerHTML = msg;
+      renderChart(data);
+      renderRank(data.ranking);
+    } catch (e) {
+      status.textContent = '请求失败: ' + (e.message || e);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  window.addEventListener('resize', () => chart.resize());
+  // Auto-load once
+  document.getElementById('btn-run').click();
+})();
+</script>
+{% endblock %}
