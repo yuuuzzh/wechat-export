@@ -333,6 +333,12 @@
     var senderName = _str(src.sender_display_name) || _str(src.sender_username);
     var snippet = _str(src.snippet);
     var spans = normalizeSpans(src.match_spans, snippet.length);
+    var typeLabel = _str(src.type_label);
+    // 后端已标 text_source=asr；兼容旧索引只靠正文前缀
+    if ((!typeLabel || typeLabel === '语音') &&
+        (src.text_source === 'asr' || snippet.indexOf('[语音转写]') >= 0)) {
+      typeLabel = '语音·转写';
+    }
     return {
       chatId: chatId,
       chatName: chatName,
@@ -342,7 +348,8 @@
       senderNameHtml: escapeHtml(senderName),
       ts: _num(src.create_time),
       timeText: formatTimeText(src.create_time),
-      typeLabel: _str(src.type_label),
+      typeLabel: typeLabel,
+      textSource: _str(src.text_source),
       snippet: snippet,
       spans: spans,
       html: highlightHtml(snippet, spans),

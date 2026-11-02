@@ -1107,6 +1107,12 @@ def search_messages(decrypted_dir, q, *, page=1, per_page=DEFAULT_PER_PAGE,
 
     names = _contact_names(decrypted_dir)
 
+    # 语音转写灌入 FTS 时正文带此前缀（search_index.ASR_PREFIX）
+    try:
+        from engine.services.search_index import ASR_PREFIX as _ASR_PREFIX
+    except Exception:
+        _ASR_PREFIX = '[语音转写] '
+
     results = []
     for chat_id, local_id, local_type, create_time, sender, raw_text in page_rows:
         raw = raw_text or ''
@@ -1117,6 +1123,14 @@ def search_messages(decrypted_dir, q, *, page=1, per_page=DEFAULT_PER_PAGE,
         else:
             spans = find_spans(raw, parsed, parsed['regexes'])
             snippet, rel = build_snippet(raw, spans)
+        base_type = int(local_type or 0) & 0xFFFF
+        text_source = None
+        if _ASR_PREFIX and _ASR_PREFIX in raw:
+            text_source = 'asr'
+        label = type_label(local_type)
+        # 筛选用 local_type=语音；展示上区分「转写进索引」的命中
+        if text_source == 'asr' and base_type == 34:
+            label = '语音·转写'
         item = {
             'chat_id': chat_id,
             'chat_display_name': names.get(chat_id) or chat_id,
@@ -1124,7 +1138,8 @@ def search_messages(decrypted_dir, q, *, page=1, per_page=DEFAULT_PER_PAGE,
             'local_id': local_id,
             'create_time': create_time,
             'local_type': local_type,
-            'type_label': type_label(local_type),
+            'type_label': label,
+            'text_source': text_source,
             'sender_username': sender,
             'sender_display_name': names.get(sender) or sender,
             'snippet': snippet,
