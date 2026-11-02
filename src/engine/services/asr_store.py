@@ -163,6 +163,17 @@ class AsrStore:
         return {'total': int(row['n'] or 0), 'manual': int(row['m'] or 0),
                 'hits': int(row['h'] or 0), 'path': self.path}
 
+    def list_for_fts(self, limit: int = 200000) -> list:
+        """转写条目（带 chat_id + 时间 + local_id），供搜索索引灌入语音正文。"""
+        limit = max(1, min(int(limit or 200000), 500000))
+        with self._lock:
+            cur = self._conn.execute(
+                "SELECT chat_id, create_time, local_id, text FROM transcripts"
+                " WHERE chat_id != '' AND create_time > 0 AND length(text) > 0"
+                " ORDER BY updated_at DESC LIMIT ?",
+                (limit,))
+            return [dict(r) for r in cur.fetchall()]
+
     def close(self):
         with self._lock:
             try:
@@ -213,6 +224,14 @@ def save_transcript_for_voice(decrypted_dir: str, voice_path: str, text: str, ch
     finally:
         if own:
             st.close()
+    # 同步灌入搜索索引，使「说过什么」可立即搜到（索引不存在则跳过）
+    if chat and create_time and decrypted_dir:
+        try:
+            from engine.services.search_index import upsert_asr_to_index
+            upsert_asr_to_index(
+                decrypted_dir, chat, int(create_time or 0), int(local_id or 0), text)
+        except Exception:
+            pass
     return vhash
 
 

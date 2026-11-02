@@ -762,7 +762,12 @@ def build_index(decrypted_dir, *, text=True, meta=True, force=False, progress=No
         meta_stats = (build_msg_meta_ex(conn, shards, chat_map, progress) if meta
                       else _NO_META_STATS)
         fts_stats = build_fts_ex(conn, fts_db, progress) if text else _clear_text_tables(conn)
+        asr_stats = ({'inserted': 0, 'updated': 0, 'asr_source': 0}
+                     if not text else merge_asr_into_index(conn, decrypted_dir, progress))
         if text:
+            # Refresh counts after ASR merge
+            fts_stats['rows'] = conn.execute('SELECT COUNT(*) FROM message_fts').fetchone()[0]
+            fts_stats['text_rows'] = conn.execute('SELECT COUNT(*) FROM msg_text').fetchone()[0]
             if progress:
                 progress(STAGE_OPTIMIZE, '优化全文索引...', 0.9)
             try:
@@ -774,6 +779,7 @@ def build_index(decrypted_dir, *, text=True, meta=True, force=False, progress=No
         built_at = int(time.time())
         # 「有正文、没有 msg_meta」的行数：关键词内连接会丢掉它们，必须可见（见函数注释）
         text_without_meta = _count_text_without_meta(conn)
+        asr_rows = int(asr_stats.get('inserted') or 0) + int(asr_stats.get('updated') or 0)
         _set_meta(conn, 'schema_version', SCHEMA_VERSION)
         _set_meta(conn, 'built_at', built_at)
         _set_meta(conn, 'source_rows', source_rows)
@@ -791,6 +797,7 @@ def build_index(decrypted_dir, *, text=True, meta=True, force=False, progress=No
         _set_meta(conn, 'meta_skipped_unresolved_rows',
                   meta_stats['skipped_unresolved_rows'])
         _set_meta(conn, 'meta_skipped_shards', meta_stats['skipped_shards'])
+        _set_meta(conn, 'asr_rows', asr_rows)
         conn.commit()
         if progress:
             progress(STAGE_DONE, '完成', 1.0)
@@ -801,6 +808,8 @@ def build_index(decrypted_dir, *, text=True, meta=True, force=False, progress=No
             'fts_rows_without_meta': text_without_meta,
             'source_rows': source_rows,
             'built_at': built_at,
+            'asr_rows': asr_rows,
+            'asr_source': int(asr_stats.get('asr_source') or 0),
             'meta_skipped_unresolved_tables': meta_stats['skipped_unresolved_tables'],
             'meta_skipped_unresolved_rows': meta_stats['skipped_unresolved_rows'],
             'meta_skipped_shards': meta_stats['skipped_shards'],
@@ -818,7 +827,168 @@ _STATUS_INT_KEYS = (
     'fts_rows_without_meta',
     'meta_skipped_unresolved_tables', 'meta_skipped_unresolved_rows',
     'meta_skipped_shards',
+    'asr_rows',
 )
+
+ASR_PREFIX = '[语音转写] '
+
+
+def _merge_asr_raw(existing: str, asr: str) -> str:
+    """Combine original message text with ASR transcript (idempotent)."""
+    asr = (asr or '').strip()
+    if not asr:
+        return existing or ''
+    existing = existing or ''
+    if ASR_PREFIX in existing and asr in existing:
+        return existing
+    if not existing.strip():
+        return ASR_PREFIX + asr
+    if asr in existing:
+        return existing
+    return existing.rstrip() + '\n' + ASR_PREFIX + asr
+
+
+def _upsert_asr_row(conn, chat_id: str, local_id: int, create_time: int, asr: str) -> str:
+    """Insert/update one ASR into msg_text + message_fts. Returns action tag."""
+    asr = (asr or '').strip()
+    if not chat_id or not asr or not create_time:
+        return 'skip'
+    # Prefer rows that already exist in msg_meta (so keyword JOIN keeps them)
+    meta = conn.execute(
+        'SELECT 1 FROM msg_meta WHERE chat_id=? AND local_id=? AND create_time=?',
+        (chat_id, int(local_id or 0), int(create_time)),
+    ).fetchone()
+    if not meta:
+        return 'no_meta'
+
+    row = conn.execute(
+        'SELECT rowid, raw_text FROM msg_text'
+        ' WHERE chat_id=? AND local_id=? AND create_time=?',
+        (chat_id, int(local_id or 0), int(create_time)),
+    ).fetchone()
+    new_raw = _merge_asr_raw(row[1] if row else '', asr)
+    tokens = to_char_token_text(new_raw)
+    if not tokens:
+        return 'skip'
+    if row:
+        rowid = int(row[0])
+        if (row[1] or '') == new_raw:
+            return 'same'
+        conn.execute('UPDATE msg_text SET raw_text=? WHERE rowid=?', (new_raw, rowid))
+        conn.execute('DELETE FROM message_fts WHERE rowid=?', (rowid,))
+        conn.execute(
+            'INSERT INTO message_fts(rowid, text, chat_id, local_id, create_time)'
+            ' VALUES (?,?,?,?,?)',
+            (rowid, tokens, chat_id, int(local_id or 0), int(create_time)),
+        )
+        return 'updated'
+
+    # New text row for voice that had empty WeChat FTS content
+    next_id = conn.execute(
+        'SELECT COALESCE(MAX(rowid), 0) FROM msg_text'
+    ).fetchone()[0] + 1
+    fts_max = conn.execute(
+        'SELECT COALESCE(MAX(rowid), 0) FROM message_fts'
+    ).fetchone()[0]
+    rowid = max(next_id, int(fts_max) + 1)
+    conn.execute(
+        'INSERT INTO msg_text(rowid, chat_id, local_id, create_time, raw_text)'
+        ' VALUES (?,?,?,?,?)',
+        (rowid, chat_id, int(local_id or 0), int(create_time), new_raw),
+    )
+    conn.execute(
+        'INSERT INTO message_fts(rowid, text, chat_id, local_id, create_time)'
+        ' VALUES (?,?,?,?,?)',
+        (rowid, tokens, chat_id, int(local_id or 0), int(create_time)),
+    )
+    return 'inserted'
+
+
+def merge_asr_into_index(conn, decrypted_dir, progress=None) -> dict:
+    """Inject saved voice transcripts into message_fts / msg_text (after WeChat FTS load)."""
+    stats = {
+        'asr_source': 0, 'inserted': 0, 'updated': 0, 'same': 0,
+        'skipped_no_meta': 0, 'skipped': 0,
+    }
+    try:
+        from engine.services.asr_store import AsrStore
+        store = AsrStore()
+        try:
+            items = store.list_for_fts()
+        finally:
+            store.close()
+    except Exception:
+        return stats
+
+    stats['asr_source'] = len(items)
+    if not items:
+        return stats
+    if progress:
+        progress(STAGE_TEXT, '灌入语音转写…', 0.95)
+    _ensure_text_table(conn)
+    _create_fts_table_if_missing(conn)
+    for it in items:
+        action = _upsert_asr_row(
+            conn,
+            it.get('chat_id') or '',
+            int(it.get('local_id') or 0),
+            int(it.get('create_time') or 0),
+            it.get('text') or '',
+        )
+        if action == 'inserted':
+            stats['inserted'] += 1
+        elif action == 'updated':
+            stats['updated'] += 1
+        elif action == 'same':
+            stats['same'] += 1
+        elif action == 'no_meta':
+            stats['skipped_no_meta'] += 1
+        else:
+            stats['skipped'] += 1
+    conn.commit()
+    return stats
+
+
+def _create_fts_table_if_missing(conn):
+    """Don't DROP existing FTS — only create when absent (ASR merge path)."""
+    if _table_exists(conn, 'message_fts'):
+        return
+    conn.execute("""
+CREATE VIRTUAL TABLE message_fts USING fts5(
+  text,
+  chat_id UNINDEXED,
+  local_id UNINDEXED,
+  create_time UNINDEXED,
+  tokenize = 'unicode61'
+)""")
+
+
+def upsert_asr_to_index(decrypted_dir, chat_id, create_time, local_id, text) -> str:
+    """Live-patch search index when a new transcript is saved. Returns action tag."""
+    path = index_path(decrypted_dir)
+    if not path or not os.path.isfile(path):
+        return 'no_index'
+    try:
+        conn = sqlite3.connect(path, timeout=30)
+    except sqlite3.Error:
+        return 'no_index'
+    try:
+        action = _upsert_asr_row(
+            conn, chat_id or '', int(local_id or 0), int(create_time or 0), text or '')
+        if action in ('inserted', 'updated'):
+            # Keep asr_rows roughly accurate
+            prev = _meta_int(conn, 'asr_rows')
+            if action == 'inserted':
+                _set_meta(conn, 'asr_rows', prev + 1)
+            conn.commit()
+        return action
+    except sqlite3.Error:
+        return 'error'
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 def index_status(decrypted_dir):

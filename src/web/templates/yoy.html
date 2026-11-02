@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}跨年对比 — WeChat Export{% endblock %}
+{% block content %}
+<a href="/" class="back-link">← 返回仪表盘</a>
+<h2 style="margin:0 0 4px 0">跨年对比报告</h2>
+<p style="color:var(--px-muted);font-size:12px;margin:0 0 20px 0">
+  对比今年与去年同一会话（或全部会话）的消息量、类型、时段与活跃度。全库对比需先构建搜索索引。
+</p>
+
+<div class="config-panel">
+  <div class="form-row">
+    <div style="flex:1">
+      <label>对比年份（vs 上一年）</label>
+      <input type="number" id="cfg-year" value="2026" min="2012" max="2035">
+    </div>
+    <div style="flex:3">
+      <label>限定会话（可选，留空=全部）</label>
+      <input id="cfg-chat" placeholder="群名 / 备注 / wxid">
+    </div>
+    <div>
+      <label>&nbsp;</label>
+      <button id="btn-run" class="btn btn-primary">生成对比</button>
+    </div>
+  </div>
+  <div id="status-line" style="margin-top:10px;font-size:12px;color:var(--px-muted);line-height:1.6"></div>
+</div>
+
+<div id="result" style="display:none;margin-top:16px">
+  <div class="config-panel">
+    <h3 id="title-line" style="margin:0 0 12px;font-size:16px"></h3>
+    <div id="delta-pills" class="stat-row"></div>
+  </div>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:16px">
+    <div class="config-panel" style="flex:1;min-width:280px">
+      <h3 style="margin:0 0 8px;font-size:14px">月度消息量</h3>
+      <div id="chart-month" style="height:280px"></div>
+    </div>
+    <div class="config-panel" style="flex:1;min-width:280px">
+      <h3 style="margin:0 0 8px;font-size:14px">24 小时分布</h3>
+      <div id="chart-hour" style="height:280px"></div>
+    </div>
+  </div>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:16px">
+    <div class="config-panel" style="flex:1;min-width:280px">
+      <h3 style="margin:0 0 8px;font-size:14px">星期分布</h3>
+      <div id="chart-dow" style="height:260px"></div>
+    </div>
+    <div class="config-panel" style="flex:1;min-width:280px">
+      <h3 style="margin:0 0 8px;font-size:14px">消息类型</h3>
+      <div id="chart-type" style="height:260px"></div>
+    </div>
+  </div>
+  <div class="config-panel" style="margin-top:16px">
+    <h3 style="margin:0 0 8px;font-size:14px">会话排行（两年对照）</h3>
+    <div id="chat-rank" style="font-size:12px;overflow:auto"></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<style>
+.stat-row { display:flex; flex-wrap:wrap; gap:10px; }
+.stat-pill {
+  flex:1; min-width:110px; padding:12px 14px;
+  border:1px solid var(--px-border); background:var(--px-panel, var(--px-input-bg));
+}
+.stat-pill .sv { font-size:22px; font-weight:700; color:var(--px-text); }
+.stat-pill .sl { font-size:11px; color:var(--px-muted); margin-top:2px; }
+.stat-pill .sd { font-size:11px; margin-top:4px; }
+.sd-up { color:#3d9b72; }
+.sd-down { color:#e04570; }
+.sd-flat { color:var(--px-muted); }
+</style>
+<script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
+<script>
+(function () {
+  const esc = (s) => {
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  };
+  const charts = {};
+  function chart(id) {
+    if (!charts[id]) charts[id] = echarts.init(document.getElementById(id));
+    return charts[id];
+  }
+  function deltaClass(d) {
+    if (d > 0) return 'sd-up';
+    if (d < 0) return 'sd-down';
+    return 'sd-flat';
+  }
+  function deltaText(item) {
+    const d = item.delta || 0;
+    const sign = d > 0 ? '+' : '';
+    let t = sign + d;
+    if (item.pct != null) t += '（' + (item.pct > 0 ? '+' : '') + item.pct + '%）';
+    return t;
+  }
+
+  function render(data) {
+    document.getElementById('result').style.display = 'block';
+    const y = data.year, py = data.prev_year;
+    const chat = data.chat;
+    let title = y + ' vs ' + py;
+    if (chat) title += ' · ' + (chat.display_name || chat.chat_id);
+    else title += ' · 全部会话';
+    document.getElementById('title-line').textContent = title;
+
+    let pills = '';
+    for (const item of (data.deltas || [])) {
+      pills += '<div class="stat-pill"><div class="sv">' + esc(item.current) + '</div>'
+        + '<div class="sl">' + esc(item.label) + ' · 去年 ' + esc(item.previous) + '</div>'
+        + '<div class="sd ' + deltaClass(item.delta) + '">' + esc(deltaText(item)) + '</div></div>';
+    }
+    document.getElementById('delta-pills').innerHTML = pills;
+
+    const cur = data.current || {}, prev = data.previous || {};
+    const months = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+    chart('chart-month').setOption({
+      tooltip: { trigger: 'axis' },
+      legend: { data: [String(py), String(y)], textStyle: { color: '#8fb9a6' } },
+      grid: { left: 40, right: 16, top: 36, bottom: 28 },
+      xAxis: { type: 'category', data: months, axisLabel: { color: '#8fb9a6' } },
+      yAxis: { type: 'value', axisLabel: { color: '#8fb9a6' }, splitLine: { lineStyle: { color: '#2f6b54' } } },
+      series: [
+        { name: String(py), type: 'bar', data: prev.monthly || [], itemStyle: { color: '#6b8f7e' } },
+        { name: String(y), type: 'bar', data: cur.monthly || [], itemStyle: { color: '#3d9b72' } },
+      ],
+    }, true);
+
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+    chart('chart-hour').setOption({
+      tooltip: { trigger: 'axis' },
+      legend: { data: [String(py), String(y)], textStyle: { color: '#8fb9a6' } },
+      grid: { left: 40, right: 16, top: 36, bottom: 28 },
+      xAxis: { type: 'category', data: hours, axisLabel: { color: '#8fb9a6', interval: 2 } },
+      yAxis: { type: 'value', axisLabel: { color: '#8fb9a6' }, splitLine: { lineStyle: { color: '#2f6b54' } } },
+      series: [
+        { name: String(py), type: 'line', smooth: true, data: prev.hourly || [], itemStyle: { color: '#6b8f7e' } },
+        { name: String(y), type: 'line', smooth: true, data: cur.hourly || [], itemStyle: { color: '#3d9b72' } },
+      ],
+    }, true);
+
+    chart('chart-dow').setOption({
+      tooltip: { trigger: 'axis' },
+      legend: { data: [String(py), String(y)], textStyle: { color: '#8fb9a6' } },
+      grid: { left: 40, right: 16, top: 36, bottom: 28 },
+      xAxis: { type: 'category', data: data.dow_labels || [], axisLabel: { color: '#8fb9a6' } },
+      yAxis: { type: 'value', axisLabel: { color: '#8fb9a6' }, splitLine: { lineStyle: { color: '#2f6b54' } } },
+      series: [
+        { name: String(py), type: 'bar', data: prev.dow || [], itemStyle: { color: '#6b8f7e' } },
+        { name: String(y), type: 'bar', data: cur.dow || [], itemStyle: { color: '#3d9b72' } },
+      ],
+    }, true);
+
+    const types = data.types || [];
+    chart('chart-type').setOption({
+      tooltip: { trigger: 'axis' },
+      legend: { data: [String(py), String(y)], textStyle: { color: '#8fb9a6' } },
+      grid: { left: 70, right: 16, top: 36, bottom: 28 },
+      xAxis: { type: 'value', axisLabel: { color: '#8fb9a6' }, splitLine: { lineStyle: { color: '#2f6b54' } } },
+      yAxis: { type: 'category', data: types.map(t => t.name).reverse(), axisLabel: { color: '#8fb9a6' } },
+      series: [
+        { name: String(py), type: 'bar', data: types.map(t => t.previous).reverse(), itemStyle: { color: '#6b8f7e' } },
+        { name: String(y), type: 'bar', data: types.map(t => t.current).reverse(), itemStyle: { color: '#3d9b72' } },
+      ],
+    }, true);
+
+    // Chat rank merge
+    const map = {};
+    for (const c of (prev.top_chats || [])) {
+      map[c.chat_id] = { id: c.chat_id, name: c.display_name || c.chat_id, previous: c.count, current: 0, is_group: c.is_group };
+    }
+    for (const c of (cur.top_chats || [])) {
+      if (!map[c.chat_id]) map[c.chat_id] = { id: c.chat_id, name: c.display_name || c.chat_id, previous: 0, current: 0, is_group: c.is_group };
+      map[c.chat_id].current = c.count;
+      map[c.chat_id].name = c.display_name || map[c.chat_id].name;
+    }
+    const ranks = Object.values(map).sort((a, b) => (b.current + b.previous) - (a.current + a.previous)).slice(0, 20);
+    let html = '<table style="width:100%;border-collapse:collapse"><thead><tr style="color:var(--px-muted);text-align:left">'
+      + '<th style="padding:6px">会话</th><th>' + esc(py) + '</th><th>' + esc(y) + '</th><th>变化</th></tr></thead><tbody>';
+    for (const r of ranks) {
+      const d = r.current - r.previous;
+      html += '<tr style="border-top:1px solid var(--px-border)">'
+        + '<td style="padding:6px"><a href="/chat?open=' + encodeURIComponent(r.id) + '">' + esc(r.name) + '</a>'
+        + (r.is_group ? ' <span style="opacity:.6">[群]</span>' : '') + '</td>'
+        + '<td>' + esc(r.previous) + '</td><td>' + esc(r.current) + '</td>'
+        + '<td class="' + deltaClass(d) + '">' + (d > 0 ? '+' : '') + esc(d) + '</td></tr>';
+    }
+    html += '</tbody></table>';
+    document.getElementById('chat-rank').innerHTML = ranks.length ? html : '无会话排行（单会话对比时通常只有一行）';
+  }
+
+  document.getElementById('btn-run').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-run');
+    const status = document.getElementById('status-line');
+    btn.disabled = true;
+    status.textContent = '正在统计…';
+    try {
+      const res = await fetch('/api/yoy/compare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          year: parseInt(document.getElementById('cfg-year').value, 10),
+          chat: document.getElementById('cfg-chat').value.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        status.textContent = data.error || '失败';
+        document.getElementById('result').style.display = 'none';
+        return;
+      }
+      let msg = '数据源：' + esc(data.source);
+      if ((data.warnings || []).length) msg += ' · ' + data.warnings.map(esc).join('；');
+      status.innerHTML = msg;
+      render(data);
+    } catch (e) {
+      status.textContent = '请求失败: ' + (e.message || e);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('cfg-year').value = new Date().getFullYear();
+  window.addEventListener('resize', () => Object.values(charts).forEach(c => c.resize()));
+})();
+</script>
+{% endblock %}

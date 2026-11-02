@@ -251,6 +251,12 @@ def create_app(decrypted_dir: str, wxid: str = None, db_dir: str = None) -> Flas
 
     _register_blueprint(app, 'routes.graph_api', _register_graph_bp)
 
+    def _register_yoy_bp():
+        from .routes.yoy_api import yoy_bp
+        app.register_blueprint(yoy_bp)
+
+    _register_blueprint(app, 'routes.yoy_api', _register_yoy_bp)
+
     # New: 语音导出 API（按人批量导出语音留言）
     def _register_voice_export_bp():
         from .routes.voice_export_api import voice_export_bp
@@ -434,6 +440,10 @@ def create_app(decrypted_dir: str, wxid: str = None, db_dir: str = None) -> Flas
     @app.route('/graph')
     def graph_page():
         return render_template('graph.html')
+
+    @app.route('/yoy')
+    def yoy_page():
+        return render_template('yoy.html')
 
     @app.route('/manual')
     @app.route('/docs')
