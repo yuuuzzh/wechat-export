@@ -1,7 +1,7 @@
 ﻿# WeChat Export · 微信导出
 
 > **维护者**：yuuu · **仓库**：https://github.com/yuuuzzh/wechat-export  
-> **版本**：2.12.20261022（正式版 `v0.2.0`）· **平台**：Windows 10/11 · **微信**：4.x（已测 4.1.9 / 4.1.10 / 4.1.12.55 / 4.1.15.11）  
+> **版本**：2.13.20261102（正式版 `v0.3.0`）· **平台**：Windows 10/11 · **微信**：4.x（已测 4.1.9 / 4.1.10 / 4.1.12.55 / 4.1.15.11）  
 > **定位**：本地完成微信聊天记录的**分析、搜索与多格式导出**（备份是前置步骤）
 
 数据默认不出本机 · 可执行文件名 `wechat_exp.exe`（兼容分享包与旧脚本）。界面主题可切换（像素风 / 青春风 / 科技风 / 动漫风 / 微信原始风 / QQ 复古风等，持续完善）。
@@ -445,25 +445,23 @@ python src/main.py voice-export --chat 家族群 --merge-by person --format mp3
 
 - **源码**：https://github.com/yuuuzzh/wechat-export  
 - **维护者**：yuuu  
-- **最新正式 Release**：https://github.com/yuuuzzh/wechat-export/releases/tag/v0.2.0  
-- **Windows 可执行文件**：https://github.com/yuuuzzh/wechat-export/releases/download/v0.2.0/WeChatExport-v0.2.0-windows-x64.exe  
+- **最新正式 Release**：https://github.com/yuuuzzh/wechat-export/releases/tag/v0.3.0  
+- **Windows 可执行文件**：https://github.com/yuuuzzh/wechat-export/releases/download/v0.3.0/WeChatExport-v0.3.0-windows-x64.exe  
 
 下载 exe 后双击即可；也可本地执行 `quick_build.bat` / `build.bat` 自行打包。分享包目录：`share_package/`（模板与说明）。
 
-### 8.1 `v0.2.0`（2026-10-22）
+### 8.1 `v0.3.0`（2026-11-02）
 
-相对 `v0.1.0` 的主要变化：
+相对 `v0.2.0` 的主要变化：
 
 | 方向 | 内容 |
 |------|------|
-| 归档可靠性 | 备份版本对比 / 回滚 /「这次多了哪些会话」；媒体完整性体检与一键补迁 |
-| 定时备份 | UI「每天增量」：Windows 计划任务 + bat/xml 模板、「立即跑一次」、日志预览 |
-| 隐私脱敏 | 导出前批量打码昵称 / 手机号 / 身份证，便于分享演示（不改备份库） |
-| 专项导出 | 收藏（`favorite.db`，密钥覆盖时）· 文件传输助手 |
-| 对接 | OpenAPI（`/api/openapi.json`）与 Swagger（`/swagger`） |
-| 其它 | 增量备份、朋友圈离线浏览与导出、文档与主题整理 |
+| 话题 / 事件时间线 | 按关键词聚类成事件卡片；可跳转搜索与聊天 |
+| 关系图谱 | 好友 / 群互动强度可视化（只读，ECharts） |
+| 跨年对比 | 今年 vs 去年同会话（或全部）：量级、类型、时段对照 |
+| 语音内容检索 | 转写灌入 FTS，可搜「说过什么」；命中标「语音·转写」 |
 
-`v0.2.0` 之后主线已合入：**话题 / 事件时间线**、**关系图谱**、**跨年对比**、**语音转写进 FTS**（可搜说过的话）。
+上一正式版 `v0.2.0`（2026-10-22）已含：备份版本 / 媒体完整性、定时备份、隐私脱敏、收藏与文件传输、OpenAPI 等。
 
 > `build.bat` 可能改写 `wechat_exp.spec`，构建后请还原仓库中的手工维护版本。
 
@@ -471,4 +469,4 @@ python src/main.py voice-export --chat 家族群 --merge-by person --format mp3
 
 ---
 
-**最后更新**：2026-10-22 · WeChat Export by yuuu · 最新正式 tag `v0.2.0`
+**最后更新**：2026-11-02 · WeChat Export by yuuu · 最新正式 tag `v0.3.0`
