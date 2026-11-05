@@ -278,7 +278,8 @@ def export_chat():
       contact / contacts: 单个或多个会话 username
       keyword: 关键词（空格=AND，| =OR）
       date_start / date_end: YYYY-MM-DD
-      format: txt | html | xlsx | csv | md | json | pgsql | chatlab-jsonl | chatlab-json
+      format: txt | html | xlsx | csv | md | json | pgsql | session-pack |
+              notes-pack | chatlab-jsonl | chatlab-json
       merge: 多会话 txt/html 是否合并（xlsx/csv 始终合并）
       include_asr: 是否带上已转写语音文字
       privacy_redact: 导出前脱敏昵称/手机号/身份证（分享演示）
@@ -478,6 +479,37 @@ def export_chat():
                     })
                 finally:
                     shutil.rmtree(tmp_root, ignore_errors=True)
+                return
+
+            # Obsidian / Notion / Logseq：按日笔记 + 附件目录 → ZIP
+            if fmt in ('notes-pack', 'notes_pack', 'obsidian', 'logseq', 'notion'):
+                from engine.services.notes_pack import build_notes_pack
+
+                def _np_progress(pct, msg):
+                    push('export', msg, float(pct or 0))
+
+                result = build_notes_pack(
+                    decrypted_dir,
+                    targets,
+                    out_dir,
+                    start_ts=start_ts,
+                    end_ts=end_ts,
+                    keyword=keyword or None,
+                    include_asr=bool(data.get('include_asr')),
+                    print_fn=_print,
+                    progress_fn=_np_progress,
+                )
+                if not result.get('ok'):
+                    push.error(result.get('error') or '笔记包导出失败')
+                    return
+                st = result.get('stats') or {}
+                push.done({
+                    'msg_count': st.get('msg_count') or 0,
+                    'download_url': '/api/export/download/' + result['filename'],
+                    'filename': result['filename'],
+                    'note': '笔记包：daily/ 按日 Markdown + attachments/ 附件（Obsidian/Logseq/Notion）',
+                    'stats': st,
+                })
                 return
 
             # ChatLab：逐会话导出（多选时打包 zip）

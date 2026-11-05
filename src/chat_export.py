@@ -212,8 +212,12 @@ def _normalize_tables(chat_info):
 
 
 def collect_messages(chat_info, start_ts=None, end_ts=None, keyword=None,
-                     include_asr=False, asr_lookup=None, display_name=None):
-    """收集单个会话的消息，返回标准化消息列表（已按时间排序）。"""
+                     include_asr=False, asr_lookup=None, display_name=None,
+                     include_raw=False):
+    """收集单个会话的消息，返回标准化消息列表（已按时间排序）。
+
+    include_raw=True 时额外带上 ``raw``（解码后的原文/XML），供笔记包解析附件 md5。
+    """
     if include_asr and asr_lookup is None:
         asr_lookup = make_asr_lookup(_chat_id_of(chat_info))
 
@@ -331,7 +335,7 @@ def collect_messages(chat_info, start_ts=None, end_ts=None, keyword=None,
             continue
 
         dt = datetime.fromtimestamp(create_time, tz=TZ)
-        messages.append({
+        item = {
             "create_time": create_time,
             "timestamp": dt.strftime("%Y-%m-%d %H:%M:%S"),
             "date": dt.strftime("%Y-%m-%d"),
@@ -345,7 +349,10 @@ def collect_messages(chat_info, start_ts=None, end_ts=None, keyword=None,
             "chat_id": uname,
             "is_group": is_group,
             "local_id": local_id,
-        })
+        }
+        if include_raw:
+            item["raw"] = content if isinstance(content, str) else ""
+        messages.append(item)
 
     return messages
 

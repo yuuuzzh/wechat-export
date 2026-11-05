@@ -125,7 +125,9 @@ Host: 127.0.0.1:5000
 }
 ```
 
-`format` 支持：`txt` · `html` · `xlsx` · `csv` · `md` · `json` · `pgsql` · `session-pack` · `chatlab-jsonl` · `chatlab-json`。
+`format` 支持：`txt` · `html` · `xlsx` · `csv` · `md` · `json` · `pgsql` · `session-pack` · `notes-pack` · `chatlab-jsonl` · `chatlab-json`。
+
+`notes-pack`：按日 Markdown + `attachments/` 的 ZIP（Obsidian / Logseq / Notion 可导入）；别名 `obsidian` / `logseq` / `notion`。
 
 **隐私脱敏**（`privacy_redact: true`）：仅改写导出文件，不修改本机备份。昵称可映射为「联系人甲 / 示例群聊」（`style: placeholder`）或星号打码（`asterisk`）；正文中的大陆手机号、15/18 位身份证号批量打码。文件名会加 `脱敏_` 前缀。
 

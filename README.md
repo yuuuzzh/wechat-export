@@ -31,7 +31,7 @@
 |-----------|----------------------|
 | 数据边界 | 默认本机闭环；备份后可在微信关闭时继续查与导出 |
 | 可复现流水线 | 一键备份（可增量）→ 查看 / 搜索 / 报告 → 多格式导出 |
-| 导出与对接 | TXT / HTML / Excel / CSV / Markdown / JSON / PGSQL / 会话报告包 / ChatLab；本地 HTTP API（`/api/openapi.json`、`/swagger`） |
+| 导出与对接 | TXT / HTML / Excel / CSV / Markdown / JSON / PGSQL / 会话报告包 / 笔记包 / ChatLab；本地 HTTP API（`/api/openapi.json`、`/swagger`） |
 | 工程形态 | 开源 Python + 单文件 `wechat_exp.exe`，无「必须自备原生解密插件」才能跑主流程 |
 | 不做的事 | 不承诺实时防撤回、桌面弹窗、写回微信库等挂钩能力（风险高、与本产品定位不符） |
 
@@ -132,7 +132,7 @@
 
 | 分区 | 入口 |
 |------|------|
-| 分析与导出 | 聊天导出 · 全局搜索 · 话题/事件时间线 · 关系图谱 · 跨年对比 · 综合报告 · 年度报告 · 词云 · 语音导出 · 收藏 / 文件传输助手 |
+| 分析与导出 | 聊天导出（含笔记包）· 全局搜索 · 话题/事件时间线 · 关系图谱 · 跨年对比 · 综合报告 · 年度报告 · 词云 · 语音导出 · 收藏 / 文件传输助手 |
 | 浏览 | 聊天查看器 · 通讯录 |
 | 数据采集 | 一键备份、备份版本、媒体完整性、定时备份（每天增量 / 计划任务模板） |
 | 更多导出 | HTTP API / OpenAPI（Swagger）· Pull 数据源 · 员工报表 |
@@ -189,7 +189,10 @@
 | HTML | 对话气泡，页内可再搜 |
 | TXT / CSV | 纯文本 / 表格 |
 | **会话报告包 ZIP** | 每个会话：`chat.html` + `wordcloud.html` + `stats.json` |
+| **笔记包 ZIP** | 按日 Markdown（`daily/`）+ `attachments/` + 会话索引；可导入 Obsidian / Logseq / Notion |
 | ChatLab JSONL / JSON | 导入 ChatLab；支持关键词过滤；JSONL 可断点续传 |
+
+**笔记包**：导出 ZIP 解压后按包内 `README.md` 导入。能解析到的本地图片/视频/语音会复制进当日附件目录；找不到的仍保留 `[图片]` 等文字占位（可先做媒体完整性补迁）。
 
 ![导出页](screenshots/08-export-page-masked.png)  
 *图 5：多选会话 · 关键词 · 多格式（含会话报告包）*
@@ -460,6 +463,8 @@ python src/main.py voice-export --chat 家族群 --merge-by person --format mp3
 | 关系图谱 | 好友 / 群互动强度可视化（只读，ECharts） |
 | 跨年对比 | 今年 vs 去年同会话（或全部）：量级、类型、时段对照 |
 | 语音内容检索 | 转写灌入 FTS，可搜「说过什么」；命中标「语音·转写」 |
+
+`v0.3.0` 之后主线已合入：**笔记包**（Obsidian / Notion / Logseq：按日笔记 + 附件目录）。
 
 上一正式版 `v0.2.0`（2026-10-22）已含：备份版本 / 媒体完整性、定时备份、隐私脱敏、收藏与文件传输、OpenAPI 等。
 
