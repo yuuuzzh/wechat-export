@@ -1,0 +1,152 @@
+# -*- coding: utf-8 -*-
+"""Runtime platform capabilities for WeChat Export.
+
+TraceMemo can ship macOS because it bundles native WCDB + key helpers.
+WeChat Export's analysis/export core is portable Python; the hard blockers
+are Win32 process-memory key extraction and Windows packaging. This module
+exposes what the current host can do so the UI/CLI can degrade gracefully.
+"""
+from __future__ import annotations
+
+import os
+import platform
+import shutil
+import sys
+from typing import Any
+
+
+def is_windows() -> bool:
+    return sys.platform.startswith('win')
+
+
+def is_macos() -> bool:
+    return sys.platform == 'darwin'
+
+
+def is_linux() -> bool:
+    return sys.platform.startswith('linux')
+
+
+def system_name() -> str:
+    if is_windows():
+        return 'windows'
+    if is_macos():
+        return 'macos'
+    if is_linux():
+        return 'linux'
+    return sys.platform or 'unknown'
+
+
+def auto_key_extract_supported() -> bool:
+    """Process-memory / Config.Cipher auto extract is Windows-only today."""
+    return is_windows()
+
+
+def v2_key_harvest_supported() -> bool:
+    return is_windows()
+
+
+def task_scheduler_supported() -> bool:
+    """Windows Task Scheduler templates; macOS launchd not implemented yet."""
+    return is_windows()
+
+
+def ffmpeg_install_zip_supported() -> bool:
+    """One-click Windows ZIP install; Mac users should use brew."""
+    return is_windows()
+
+
+def find_ffmpeg() -> str:
+    found = shutil.which('ffmpeg')
+    if found:
+        return found
+    # Also accept tools/ffmpeg(.exe) — media module has richer search.
+    try:
+        from engine.services.media import _find_ffmpeg
+        return _find_ffmpeg() or ''
+    except Exception:
+        return ''
+
+
+def find_silk_decoder() -> str:
+    try:
+        from engine.services.media import _find_silk_decoder
+        return _find_silk_decoder() or ''
+    except Exception:
+        return ''
+
+
+def open_path(path: str) -> bool:
+    """Open a folder/file with the OS file manager. Cross-platform."""
+    if not path or not os.path.exists(path):
+        return False
+    try:
+        if is_windows():
+            os.startfile(path)  # type: ignore[attr-defined]
+            return True
+        if is_macos():
+            import subprocess
+            subprocess.Popen(['open', path])
+            return True
+        import subprocess
+        subprocess.Popen(['xdg-open', path])
+        return True
+    except Exception:
+        return False
+
+
+def mac_wechat_roots() -> list[str]:
+    """Candidate Mac WeChat data roots (sandbox + Application Support)."""
+    home = os.path.expanduser('~')
+    roots = [
+        os.path.join(
+            home, 'Library', 'Containers', 'com.tencent.xinWeChat',
+            'Data', 'Documents', 'xwechat_files'),
+        os.path.join(
+            home, 'Library', 'Containers', 'com.tencent.xinWeChat',
+            'Data', 'Library', 'Application Support',
+            'com.tencent.xinWeChat', 'xwechat_files'),
+        os.path.join(
+            home, 'Library', 'Application Support',
+            'com.tencent.xinWeChat', 'xwechat_files'),
+        os.path.join(home, 'Documents', 'xwechat_files'),
+    ]
+    return [p for p in roots if p]
+
+
+def capabilities() -> dict[str, Any]:
+    """Snapshot for /api/health and UI banners."""
+    return {
+        'system': system_name(),
+        'python': platform.python_version(),
+        'machine': platform.machine(),
+        'auto_key_extract': auto_key_extract_supported(),
+        'v2_key_harvest': v2_key_harvest_supported(),
+        'task_scheduler': task_scheduler_supported(),
+        'ffmpeg_zip_install': ffmpeg_install_zip_supported(),
+        'ffmpeg': bool(find_ffmpeg()),
+        'silk_decoder': bool(find_silk_decoder()),
+        'manual_keys': True,
+        'decrypted_viewer': True,
+        'notes': _platform_notes(),
+    }
+
+
+def _platform_notes() -> list[str]:
+    notes = []
+    if is_macos():
+        notes.append(
+            'macOS：自动提取密钥尚未移植（需原生 helper + 常关闭 SIP）。'
+            '请使用「手动输入密钥」或打开已解密备份；'
+            '访问微信沙盒目录需要「完全磁盘访问权限」。'
+        )
+        notes.append(
+            '建议：brew install ffmpeg；语音 SILK 解码需自行编译 tools/silk_decoder。'
+        )
+    elif is_linux():
+        notes.append(
+            'Linux：无微信官方桌面客户端密钥提取；可打开已解密备份或手动导入密钥。'
+        )
+    elif is_windows():
+        notes.append('Windows：支持一键备份、自动密钥提取与计划任务。')
+    return notes

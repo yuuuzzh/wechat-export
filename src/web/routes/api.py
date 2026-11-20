@@ -55,6 +55,7 @@ def health():
     from datetime import datetime
     from engine.constants import TZ
     from engine.version import VERSION
+    from engine.platform_info import capabilities as platform_capabilities
     decrypted, wxid, _ = _cfg()
     backup_ready = bool(decrypted and os.path.isdir(decrypted))
     now = datetime.now(TZ)
@@ -67,6 +68,7 @@ def health():
         'wxid': wxid or None,
         'server_time': now.isoformat(timespec='seconds'),
         'timezone': 'Asia/Shanghai',
+        'platform': platform_capabilities(),
         'skill': {
             'name': _SKILL_NAME,
             'version': _SKILL_VERSION,
@@ -934,27 +936,38 @@ def wxgf_install_ffmpeg():
 @api_bp.route("/wxgf/open-tools", methods=["POST"])
 def wxgf_open_tools():
     """POST /api/wxgf/open-tools — 打开 tools 目录并写入放置说明。"""
+    from engine.platform_info import is_macos, is_windows, open_path
     from engine.services.media import tools_dir
     d = tools_dir()
     try:
         os.makedirs(d, exist_ok=True)
-        hint = os.path.join(d, "把-ffmpeg.exe-放到这里.txt")
+        hint = os.path.join(d, "把-ffmpeg-放到这里.txt")
         if not os.path.isfile(hint):
-            with open(hint, "w", encoding="utf-8") as f:
-                f.write(
+            if is_macos():
+                body = (
+                    "微信 wxgf(H.265) 图片需要 ffmpeg 才能显示原图。\n\n"
+                    "macOS 推荐：\n"
+                    "  brew install ffmpeg\n"
+                    "或把 ffmpeg 可执行文件复制到本目录。\n"
+                    "程序每次请求都会重新检测，放入后无需重启。\n"
+                )
+            elif is_windows():
+                body = (
                     "微信 wxgf(H.265) 图片需要 ffmpeg 才能显示原图。\n\n"
                     "使用方法：\n"
                     "  1) 下载 Windows 版 ffmpeg（解压即用）：\n"
                     "     https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip\n"
                     "  2) 解压后把 bin\\ffmpeg.exe 复制到本目录\n"
                     "  3) 回到聊天查看器点「重试」，图片会自动转换\n\n"
-                    "程序每次请求都会重新检测本目录，放入后无需重启。\n")
-        opened = False
-        try:
-            os.startfile(d)
-            opened = True
-        except Exception:
-            pass
+                    "程序每次请求都会重新检测本目录，放入后无需重启。\n"
+                )
+            else:
+                body = (
+                    "请安装 ffmpeg（例如 apt/yum/pacman），或把 ffmpeg 放到本目录。\n"
+                )
+            with open(hint, "w", encoding="utf-8") as f:
+                f.write(body)
+        opened = open_path(d)
         return jsonify({"ok": True, "toolsDir": d, "opened": opened})
     except Exception as e:
         return jsonify({"error": "open_failed", "message": str(e), "toolsDir": d}), 500

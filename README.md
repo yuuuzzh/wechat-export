@@ -117,9 +117,33 @@
 
 | 项 | 说明 |
 |----|------|
-| 系统 | Windows 10 / 11（64 位） |
-| 微信 | 4.x（上表已测版本；其余未保证） |
+| 系统 | **Windows 10/11（完整能力）**；**macOS / Linux（源码模式）** 可打开已解密备份、手动导入密钥、分析与导出 |
+| 微信 | Windows 微信 4.x（上表已测）；macOS 微信 4.x 可读数据目录，但**自动提取密钥尚未移植** |
 | 磁盘 | 约等于微信数据目录大小（常见 2–10 GB） |
+
+### 平台差异（为何 TraceMemo 能跑 Mac，而本项目长期标 Windows）
+
+| 能力 | Windows | macOS / Linux |
+|------|---------|---------------|
+| 查看已解密备份 / 导出 / 搜索 / 报告 / 群聊日报 | ✅ | ✅ |
+| 手动粘贴密钥后解密 | ✅ | ✅ |
+| 自动从进程提取 DB 密钥 | ✅ | ❌（需原生 helper，类似 TraceMemo 的 `xkey_helper`） |
+| V2 图片密钥进程收割 | ✅ | ❌ |
+| 计划任务一键安装 | ✅（Task Scheduler） | ❌（尚未做 launchd） |
+| 手机 App | ❌ | ❌（不做原生提取；报表 HTML / 窄屏 Web 可手机打开） |
+
+macOS 快速开始（已有密钥或已解密目录）：
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+# 打开已解密备份
+python3 src/main.py serve --decrypted-dir "/path/to/backup"
+# 或指定 Mac 微信 db_storage + 手动密钥后再备份
+python3 src/main.py serve --db-dir "$HOME/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/<账号>/db_storage"
+```
+
+访问微信沙盒目录需在「系统设置 → 隐私与安全性 → 完全磁盘访问权限」允许终端/Python。建议 `brew install ffmpeg`。
 | 运行时 | 独立 exe，**不需要**安装 Python |
 
 ---

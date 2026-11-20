@@ -18,7 +18,6 @@ x'<64hex key><32hex salt>' literal for every DB — readable WITHOUT admin right
 """
 import ctypes
 import hashlib
-import hmac as hmac_mod
 import json
 import os
 import re
@@ -27,53 +26,22 @@ import sys
 import threading
 import time
 
-# Strategy 3: read-only Config.Cipher scan (WeChat 4.1.10+, no admin needed)
-from engine.services.config_cipher_extract import extract_keys_via_config_cipher
+from engine.db_key_crypto import (  # noqa: F401 — re-export for callers
+    KEY_SZ,
+    PAGE_SZ,
+    SALT_SZ,
+    collect_db_files,
+    verify_enc_key,
+)
 from engine.utils import account_id_candidates
-
-PAGE_SZ = 4096
-KEY_SZ = 32
-SALT_SZ = 16
 
 _KNOWN_EXE_NAMES = {'weixin.exe', 'wechat.exe'}
 
 
-# ---------------------------------------------------------------------------
-#  HMAC verification (SQLCipher 4)
-# ---------------------------------------------------------------------------
-def verify_enc_key(enc_key, db_page1):
-    salt = db_page1[:SALT_SZ]
-    mac_salt = bytes(b ^ 0x3A for b in salt)
-    mac_key = hashlib.pbkdf2_hmac("sha512", enc_key, mac_salt, 2, dklen=KEY_SZ)
-    hmac_data = db_page1[SALT_SZ: PAGE_SZ - 80 + 16]
-    stored_hmac = db_page1[PAGE_SZ - 64: PAGE_SZ]
-    hm = hmac_mod.new(mac_key, hmac_data, hashlib.sha512)
-    hm.update(struct.pack("<I", 1))
-    return hm.digest() == stored_hmac
-
-
-# ---------------------------------------------------------------------------
-#  DB file collection
-# ---------------------------------------------------------------------------
-def collect_db_files(db_dir):
-    """Walk db_dir and collect all .db files with their salts."""
-    db_files = []
-    salt_to_dbs = {}
-    for root, dirs, files in os.walk(db_dir):
-        for name in files:
-            if not name.endswith(".db") or name.endswith("-wal") or name.endswith("-shm"):
-                continue
-            path = os.path.join(root, name)
-            size = os.path.getsize(path)
-            if size < PAGE_SZ:
-                continue
-            with open(path, "rb") as f:
-                page1 = f.read(PAGE_SZ)
-            rel = os.path.relpath(path, db_dir)
-            salt = page1[:SALT_SZ].hex()
-            db_files.append((rel, path, size, salt, page1))
-            salt_to_dbs.setdefault(salt, []).append(rel)
-    return db_files, salt_to_dbs
+def _extract_keys_via_config_cipher(*args, **kwargs):
+    """Lazy import: config_cipher_extract binds Win32 APIs at import time."""
+    from engine.services.config_cipher_extract import extract_keys_via_config_cipher
+    return extract_keys_via_config_cipher(*args, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -1080,7 +1048,7 @@ def extract_all_keys(db_dir, print_fn=None, progress_fn=None,
     if len(key_map) < len(salt_to_dbs):
         progress_fn(25, "Config.Cipher 只读扫描 (无需管理员)...")
         try:
-            found = extract_keys_via_config_cipher(
+            found = _extract_keys_via_config_cipher(
                 db_dir, db_files, salt_to_dbs, key_map, print_fn, progress_fn)
             progress_fn(45, f"Config.Cipher: {found} keys extracted")
         except Exception as e:

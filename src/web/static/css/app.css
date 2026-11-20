@@ -263,6 +263,23 @@ body:has(#cleanup-app) #content { max-width: none; padding: 0; margin: 0; }
 #sidebar { width: 280px; min-width: 280px; background: var(--px-panel); border-right: 3px solid var(--px-border); display: flex; flex-direction: column; }
 #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
+/* Mobile / narrow: stack chat viewer; hide sidebar until toggled */
+@media (max-width: 720px) {
+  #app { flex-direction: column; height: auto; min-height: calc(100vh - var(--nav-h)); }
+  #sidebar {
+    width: 100%; min-width: 0; max-height: 42vh;
+    border-right: none; border-bottom: 3px solid var(--px-border);
+  }
+  #main { min-height: 55vh; }
+  .chat-header { flex-wrap: wrap; gap: 6px; }
+  .dashboard-grid { grid-template-columns: 1fr !important; }
+  #content { padding: 12px 10px 32px; }
+  .form-row { flex-direction: column; align-items: stretch !important; }
+  .nav-tagline, .nav-version { display: none; }
+  .backup-job-chip { max-width: 140px; }
+  .silent-grid { grid-template-columns: 1fr 1fr; }
+}
+
 .sidebar-header { padding: 12px; border-bottom: 1px solid var(--px-border); }
 .sidebar-header input { width: 100%; padding: 8px 12px; background: var(--px-bg); color: var(--px-text); border: 1px solid var(--px-border); border-radius: var(--radius-sm); font-size: 13px; outline: none; }
 .sidebar-header input:focus { border-color: var(--px-gold); }

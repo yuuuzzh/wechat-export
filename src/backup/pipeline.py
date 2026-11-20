@@ -56,30 +56,40 @@ def run_backup(
 
     if harvest_keys:
         try:
-            from engine.services.v2_key_extract import is_wechat_running as _wx_running
-            if _wx_running():
-                on_progress('scan', '微信正在运行，后台收割 V2 图片密钥中...', 0.0)
-                harvester_stop = threading.Event()
+            from engine.platform_info import v2_key_harvest_supported
+            if not v2_key_harvest_supported():
+                on_progress(
+                    'scan',
+                    '当前系统不支持进程内 V2 密钥收割（仅 Windows），已跳过；'
+                    '可继续用已有密钥或手动导入密钥。',
+                    0.02,
+                )
+            else:
+                from engine.services.v2_key_extract import is_wechat_running as _wx_running
+                if _wx_running():
+                    on_progress('scan', '微信正在运行，后台收割 V2 图片密钥中...', 0.0)
+                    harvester_stop = threading.Event()
 
-                def _run_harvester():
-                    from engine.services.v2_key_extract import harvest_v2_keys
-                    try:
-                        harvester_result[0] = harvest_v2_keys(
-                            output_dir,
-                            wxid=None,
-                            interval=1.5,
-                            max_rounds=None,
-                            print_fn=lambda m: on_progress('harvest', m, 0.5),
-                            stop_event=harvester_stop,
-                        )
-                    except Exception:
-                        pass
+                    def _run_harvester():
+                        from engine.services.v2_key_extract import harvest_v2_keys
+                        try:
+                            harvester_result[0] = harvest_v2_keys(
+                                output_dir,
+                                wxid=None,
+                                interval=1.5,
+                                max_rounds=None,
+                                print_fn=lambda m: on_progress('harvest', m, 0.5),
+                                stop_event=harvester_stop,
+                            )
+                        except Exception:
+                            pass
 
-                harvester_thread = threading.Thread(
-                    target=_run_harvester, daemon=True)
-                harvester_thread.start()
-                on_progress('scan', '后台 V2 密钥收割已启动，请在微信中滚动浏览图片', 0.05)
-        except ImportError:
+                    harvester_thread = threading.Thread(
+                        target=_run_harvester, daemon=True)
+                    harvester_thread.start()
+                    on_progress('scan', '后台 V2 密钥收割已启动，请在微信中滚动浏览图片', 0.05)
+        except Exception:
+            # ImportError / AttributeError on non-Windows windll, etc.
             pass
 
     # Stage 1: Scan
@@ -115,9 +125,16 @@ def run_backup(
     try:
         on_progress('decrypt', 'Loading decryption keys...', 0.0)
         from .decryptor import load_keys, decrypt_for_backup
+        from engine.platform_info import auto_key_extract_supported
         keys = load_keys(key_file)
         if not keys:
-            # Auto-extract keys from WeChat process memory
+            # Auto-extract keys from WeChat process memory (Windows only)
+            if not auto_key_extract_supported():
+                result['errors'].append(
+                    '未找到数据库密钥。当前系统不支持自动提取（仅 Windows）；'
+                    '请打开「手动输入密钥」粘贴已有密钥，或指定已解密备份目录。')
+                _stop_harvester(harvester_stop, harvester_thread, harvester_result)
+                return result
             on_progress('decrypt', '未找到密钥，正在从微信进程自动提取...', 0.05)
             try:
                 import key_scan
@@ -129,13 +146,13 @@ def run_backup(
                 result['errors'].append(
                     f'未找到数据库密钥且自动提取失败: {ke}。'
                     f'请确保微信(Weixin.exe/WeChat.exe)正在运行，'
-                    f'然后在 Web 页面执行"密钥提取"')
+                    f'然后在 Web 页面执行"密钥提取"或「手动输入密钥」')
                 _stop_harvester(harvester_stop, harvester_thread, harvester_result)
                 return result
             if not keys:
                 result['errors'].append(
                     '自动密钥提取未获得任何密钥。'
-                    '请确保微信正在运行，然后在 Web 页面执行"密钥提取"')
+                    '请确保微信正在运行，然后在 Web 页面执行"密钥提取"或「手动输入密钥」')
                 _stop_harvester(harvester_stop, harvester_thread, harvester_result)
                 return result
 
@@ -147,7 +164,7 @@ def run_backup(
         )
 
         # If some DBs couldn't be decrypted, try extracting keys from memory
-        if skipped_keys:
+        if skipped_keys and auto_key_extract_supported():
             on_progress('decrypt',
                 f'{len(skipped_keys)} 数据库缺密钥，正在从微信进程自动提取...', 0.82)
             try:

@@ -2,11 +2,12 @@
 公共工具: 微信路径自动检测、联系人加载、群聊名称解析、消息DB迭代。
 """
 import glob as _glob
+import hashlib
 import os
 import re
 import shutil
 import sqlite3
-import hashlib
+import sys
 from collections import defaultdict
 
 
@@ -52,27 +53,39 @@ def _normalize_save_path(value):
     """把微信的特殊保存位置记号转成真实路径。"""
     v = (value or "").strip().strip(chr(34))
     low = v.lower().rstrip(":")
-    home = os.environ.get("USERPROFILE", "")
+    home = os.environ.get("USERPROFILE") or os.path.expanduser("~")
     if low in ("mydocument", "mydocuments", "documents", "document"):
         return os.path.join(home, "Documents")
     if low in ("mydesktop", "desktop"):
         return os.path.join(home, "Desktop")
+    # Expand ~ on macOS/Linux config values
+    if v.startswith("~"):
+        return os.path.expanduser(v)
     return v
 
 
 def _wechat_config_paths():
-    """读取微信自身配置（%APPDATA%\\Tencent\\xwechat\\config\\*.ini 等）。
+    """读取微信自身配置（Windows APPDATA / macOS 沙盒内配置）。
 
     不同版本写法不一：可能是纯路径、key=value、带引号、MyDocument: 记号，
     也可能直接指向 xwechat_files 或 db_storage。这里全部兜住。
     """
     appdata = os.environ.get("APPDATA", "")
     local = os.environ.get("LOCALAPPDATA", "")
+    home = os.path.expanduser("~")
     search_dirs = [
         os.path.join(appdata, "Tencent", "xwechat", "config"),
         os.path.join(appdata, "Tencent", "xwechat", "All Users", "config"),
         os.path.join(appdata, "Tencent", "WeChat", "config"),
         os.path.join(local, "Tencent", "xwechat", "config"),
+        # macOS WeChat 4.x sandbox / Application Support
+        os.path.join(
+            home, "Library", "Containers", "com.tencent.xinWeChat",
+            "Data", "Library", "Application Support",
+            "com.tencent.xinWeChat", "config"),
+        os.path.join(
+            home, "Library", "Application Support",
+            "com.tencent.xinWeChat", "config"),
     ]
     found = []
     for cfg_dir in search_dirs:
@@ -98,8 +111,10 @@ def _wechat_config_paths():
                 path = _normalize_save_path(value)
                 if len(path) < 3 or len(path) > 260:
                     continue
-                # 只要形如盘符/UNC 的路径就收下（哪怕暂时不存在）
-                if re.match(r"^[A-Za-z]:[\\/]", path) or path.startswith("\\\\"):
+                # Windows 盘符/UNC，或 POSIX 绝对路径
+                if (re.match(r"^[A-Za-z]:[\\/]", path)
+                        or path.startswith("\\\\")
+                        or path.startswith("/")):
                     found.append(os.path.normpath(path))
     return found
 
@@ -142,8 +157,10 @@ def _registry_paths():
 
 
 def _logical_drives():
-    """固定盘 + 可移动盘（跳过网络盘/光驱）。"""
+    """固定盘 + 可移动盘（跳过网络盘/光驱）。非 Windows 返回空列表。"""
     drives = []
+    if not sys.platform.startswith("win"):
+        return drives
     try:
         import ctypes
         bitmask = ctypes.windll.kernel32.GetLogicalDrives()
@@ -210,9 +227,21 @@ def _deep_find_db_storage(budget_s=15.0, max_depth=5):
     visited = 0
 
     queue = [(d, 0) for d in _logical_drives()]
-    home = os.environ.get("USERPROFILE", "")
+    home = os.environ.get("USERPROFILE") or os.path.expanduser("~")
     if home and os.path.isdir(home):
         queue.append((home, 0))
+    # macOS WeChat sandbox roots (Full Disk Access may be required)
+    try:
+        from engine.platform_info import mac_wechat_roots, is_macos
+        if is_macos():
+            for root in mac_wechat_roots():
+                parent = os.path.dirname(root)
+                if os.path.isdir(parent):
+                    queue.append((parent, 0))
+                if os.path.isdir(root):
+                    queue.append((root, 0))
+    except Exception:
+        pass
 
     interesting = ("wx", "wechat", "weixin", "tencent", "chat",
                    "\u5fae\u4fe1", "\u817e\u8baf", "files", "data")
@@ -291,16 +320,27 @@ def _get_fast_data_roots():
         _add(os.path.dirname(os.path.normpath(p.rstrip("\\/"))))
 
     # Strategy 3: 常见位置
-    userprofile = os.environ.get("USERPROFILE", "")
+    userprofile = os.environ.get("USERPROFILE") or os.path.expanduser("~")
     homedrive = os.environ.get("HOMEDRIVE", "C:")
     localappdata = os.environ.get("LOCALAPPDATA", "")
     _add(os.path.join(userprofile, "Documents"))
     _add(os.path.join(userprofile, "Documents", "xwechat_files"))
     _add(userprofile)
     _add(os.path.join(localappdata, "Tencent"))
-    _add(homedrive + os.sep)
+    if sys.platform.startswith("win"):
+        _add(homedrive + os.sep)
 
-    # Strategy 4: 所有固定盘 / 可移动盘
+    # Strategy 3b: macOS WeChat 4.x containers
+    try:
+        from engine.platform_info import mac_wechat_roots, is_macos
+        if is_macos():
+            for root in mac_wechat_roots():
+                _add(root)
+                _add(os.path.dirname(root))
+    except Exception:
+        pass
+
+    # Strategy 4: 所有固定盘 / 可移动盘（仅 Windows）
     for root in _logical_drives():
         _add(root)
 
@@ -335,6 +375,21 @@ _DETECT_CACHE = {"key": None, "value": None, "at": 0.0}
 
 def data_dir_hint(short=False):
     r"""找不到微信数据目录时给用户的排查步骤（CLI 与 Web 共用）。"""
+    if sys.platform == "darwin":
+        if short:
+            return ("未找到微信数据目录。macOS 请到 "
+                    "~/Library/Containers/com.tencent.xinWeChat/.../xwechat_files/<账号>/db_storage，"
+                    "并在「系统设置 → 隐私与安全性 → 完全磁盘访问权限」允许本程序；"
+                    "或把该路径填进输入框。")
+        return (
+            "未找到微信数据目录（db_storage）。macOS 请按顺序排查：\n"
+            "  1) 系统设置 → 隐私与安全性 → 完全磁盘访问权限，允许 Terminal / Python / 本程序\n"
+            "  2) 在访达「前往文件夹」打开：\n"
+            "     ~/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files\n"
+            "  3) 进入 <账号>/db_storage，把完整路径填到页面，或：\n"
+            "     python3 src/main.py serve --db-dir \"/path/to/db_storage\"\n"
+            "  4) 自动提取密钥尚未支持 macOS，请用「手动输入密钥」或打开已解密备份"
+        )
     if short:
         return ("未找到微信数据目录。请在微信「设置 → 文件管理 → 打开文件夹」确认 "
                 "xwechat_files\\<账号>\\db_storage 存在；然后在页面点「深度搜索」，"

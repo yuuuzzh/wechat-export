@@ -262,7 +262,7 @@ def scan_databases(db_dir, with_pages=True):
     Returns: [{"rel", "rel_norm", "name", "path", "size_mb", "salt", "page1",
                "key", "verified"}]
     """
-    from engine.services.wechat_key_extract import collect_db_files, verify_enc_key
+    from engine.db_key_crypto import collect_db_files, verify_enc_key
 
     if not db_dir or not os.path.isdir(db_dir):
         return []
@@ -343,7 +343,7 @@ def _resolve_rel(dbs, hint):
 
 def match_entries(db_dir, entries):
     """用 HMAC 实测把用户输入的密钥与数据库配对（不写配置）。"""
-    from engine.services.wechat_key_extract import verify_enc_key
+    from engine.db_key_crypto import verify_enc_key
 
     dbs = scan_databases(db_dir, with_pages=True)
     by_norm = {d["rel_norm"].lower(): d for d in dbs}

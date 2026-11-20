@@ -1300,18 +1300,22 @@ def tools_dir() -> str:
 def _ffmpeg_search_paths():
     """ffmpeg 的候选位置（按优先级）；每次调用都重新探测，用户放进去即可生效。"""
     import sys as _sys
+    names = ("ffmpeg.exe", "ffmpeg") if _sys.platform.startswith("win") else ("ffmpeg",)
     paths = []
     bundle = getattr(_sys, "_MEIPASS", None)
-    if bundle:
-        paths.append(os.path.join(bundle, "tools", "ffmpeg.exe"))
     tdir = tools_dir()
-    paths.append(os.path.join(tdir, "ffmpeg.exe"))
     exe_dir = os.path.dirname(os.path.abspath(_sys.executable)) if getattr(_sys, "frozen", False) \
         else os.path.dirname(tdir)
-    paths.append(os.path.join(exe_dir, "ffmpeg.exe"))
+    bases = []
+    if bundle:
+        bases.append(os.path.join(bundle, "tools"))
+    bases.extend([tdir, exe_dir])
     local = os.environ.get("LOCALAPPDATA", "")
     if local:
-        paths.append(os.path.join(local, "WeChatEXP", "tools", "ffmpeg.exe"))
+        bases.append(os.path.join(local, "WeChatEXP", "tools"))
+    for base in bases:
+        for name in names:
+            paths.append(os.path.join(base, name))
     return paths
 
 
@@ -2347,16 +2351,23 @@ def _decrypt_media_db_on_the_fly(src_db: str, decrypted_dir: str) -> str:
 
 
 def _find_silk_decoder():
-    """定位 silk_decoder.exe：PyInstaller 解包目录优先，其次项目 tools/。"""
+    """定位 silk_decoder：Windows 用 .exe，macOS/Linux 用无后缀可执行文件。"""
+    names = ('silk_decoder.exe', 'silk_decoder') if sys.platform.startswith('win') \
+        else ('silk_decoder', 'silk_decoder.exe')
+    bases = []
     bundle_dir = getattr(sys, '_MEIPASS', None)
     if bundle_dir:
-        candidate = os.path.join(bundle_dir, 'tools', 'silk_decoder.exe')
-        if os.path.isfile(candidate):
-            return candidate
+        bases.append(os.path.join(bundle_dir, 'tools'))
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(
         os.path.dirname(os.path.abspath(__file__)))))
-    candidate = os.path.join(project_root, 'tools', 'silk_decoder.exe')
-    return candidate if os.path.isfile(candidate) else None
+    bases.append(os.path.join(project_root, 'tools'))
+    bases.append(tools_dir())
+    for base in bases:
+        for name in names:
+            candidate = os.path.join(base, name)
+            if os.path.isfile(candidate):
+                return candidate
+    return None
 
 
 def silk_to_pcm(silk_path: str):
