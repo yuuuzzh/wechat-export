@@ -14,25 +14,30 @@ from engine.services.message.decode import decompress_content
 from engine.services.message import _build_sender_map
 from engine.services.sender_model import (ShardSenderModel, load_name2id)
 
-# 导出会话格式（chatlab 走独立模块）
-CHAT_FORMATS = ('txt', 'html', 'xlsx', 'csv', 'md', 'markdown', 'json', 'pgsql', 'sql')
+# 导出会话格式（chatlab / notes-pack / 插件走独立模块）
+CHAT_FORMATS = (
+    'txt', 'html', 'xlsx', 'csv', 'md', 'markdown', 'json', 'pgsql', 'sql',
+    'eml', 'mbox',
+)
 # 别名 → 规范名
 _FORMAT_ALIASES = {
     'markdown': 'md',
     'sql': 'pgsql',
+    'email': 'eml',
+    'mailbox': 'mbox',
 }
 
 
 def _normalize_fmt(fmt):
     fmt = (fmt or 'txt').strip().lower()
     fmt = _FORMAT_ALIASES.get(fmt, fmt)
-    if fmt not in ('txt', 'html', 'xlsx', 'csv', 'md', 'json', 'pgsql'):
+    if fmt not in ('txt', 'html', 'xlsx', 'csv', 'md', 'json', 'pgsql', 'eml', 'mbox'):
         return 'txt'
     return fmt
 
 
 def _fmt_ext(fmt):
-    return {'pgsql': 'sql', 'md': 'md'}.get(fmt, fmt)
+    return {'pgsql': 'sql', 'md': 'md', 'eml': 'zip', 'mbox': 'mbox'}.get(fmt, fmt)
 
 
 def _write_by_fmt(fmt, out_path, messages, meta):
@@ -48,6 +53,10 @@ def _write_by_fmt(fmt, out_path, messages, meta):
         _write_json(out_path, messages, meta)
     elif fmt == 'pgsql':
         _write_pgsql(out_path, messages, meta)
+    elif fmt == 'mbox':
+        _write_mbox(out_path, messages, meta)
+    elif fmt == 'eml':
+        _write_eml_zip(out_path, messages, meta)
     else:
         _write_txt(out_path, messages, meta)
 
@@ -522,8 +531,8 @@ def export_chats(chat_infos, out_dir, start_ts=None, end_ts=None, keyword=None,
         "privacy_redact": bool(privacy),
     }
 
-    # 表格/结构化：默认按时间平铺合并；txt/html/md 可按 merge 合并
-    merge_fmts = ('xlsx', 'csv', 'json', 'pgsql')
+    # 表格/结构化/邮件归档：默认合并；txt/html/md 可按 merge 合并
+    merge_fmts = ('xlsx', 'csv', 'json', 'pgsql', 'mbox', 'eml')
     text_fmts = ('txt', 'html', 'md')
     if fmt in merge_fmts or (merge and len(chat_infos) >= 1 and fmt in text_fmts):
         ext = _fmt_ext(fmt)
@@ -580,9 +589,9 @@ def export_all_contacts(decrypted_dir, out_dir, start_ts=None, end_ts=None,
                 continue
         selected.append(c)
 
-    # 表格/结构化合并；txt/html/md 按会话分文件（多文件时打 zip）
+    # 表格/结构化/邮件归档合并；txt/html/md 按会话分文件（多文件时打 zip）
     fmt = _normalize_fmt(fmt)
-    merge = fmt in ('xlsx', 'csv', 'json', 'pgsql')
+    merge = fmt in ('xlsx', 'csv', 'json', 'pgsql', 'mbox', 'eml')
     _total, path, details = export_chats(
         selected, out_dir, start_ts=start_ts, end_ts=end_ts, keyword=keyword,
         print_fn=print_fn, progress_fn=progress_fn, fmt=fmt,
@@ -629,6 +638,110 @@ def _write_txt(out_path, messages, meta):
         lines.append(f"[{m['timestamp']}] {prefix}{type_tag}{m['sender']}: {m['text']}")
     with open(out_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
+
+
+def _email_addrs(msg, meta):
+    """Invent stable local-part addresses for archival tools (Thunderbird etc.)."""
+    chat = (msg.get('chat_id') or meta.get('uname') or 'chat').strip()
+    sender = (msg.get('sender') or 'unknown').strip() or 'unknown'
+    safe_chat = re.sub(r'[^A-Za-z0-9._+-]+', '_', chat)[:48] or 'chat'
+    safe_sender = re.sub(r'[^A-Za-z0-9._+-]+', '_', sender)[:32] or 'user'
+    from_addr = f'{safe_sender}@wechat.local'
+    to_addr = f'{safe_chat}@wechat.local'
+    return from_addr, to_addr
+
+
+def _msg_to_email_message(msg, meta):
+    from email.message import EmailMessage
+    from email.utils import formatdate
+
+    em = EmailMessage()
+    from_addr, to_addr = _email_addrs(msg, meta)
+    em['From'] = from_addr
+    em['To'] = to_addr
+    chat_name = msg.get('chat_name') or meta.get('display') or ''
+    sender = msg.get('sender') or ''
+    typ = msg.get('type_name') or ''
+    subj_bits = [chat_name, sender]
+    if typ and typ != '文本':
+        subj_bits.append(f'[{typ}]')
+    em['Subject'] = ' · '.join(b for b in subj_bits if b)[:180] or 'WeChat message'
+    ts = int(msg.get('create_time') or 0)
+    if ts:
+        em['Date'] = formatdate(ts, localtime=True)
+    em['Message-ID'] = (
+        f"<{msg.get('chat_id') or 'c'}.{msg.get('local_id') or 0}."
+        f"{ts}@wechat.local>"
+    )
+    em['X-WeChat-Chat-Id'] = str(msg.get('chat_id') or '')
+    em['X-WeChat-Type'] = str(msg.get('type') or '')
+    body = msg.get('text') or ''
+    if typ and typ != '文本' and not body.startswith('['):
+        body = f'[{typ}] {body}'.strip()
+    em.set_content(body or '(empty)', charset='utf-8')
+    return em
+
+
+def _write_mbox(out_path, messages, meta):
+    """Write Unix mbox mailbox (legal / Thunderbird / Apple Mail import)."""
+    import mailbox
+    # mailbox.mbox creates/overwrites path; remove stale first
+    if os.path.isfile(out_path):
+        try:
+            os.remove(out_path)
+        except OSError:
+            pass
+    mbox = mailbox.mbox(out_path)
+    mbox.lock()
+    try:
+        for msg in messages:
+            mbox.add(_msg_to_email_message(msg, meta))
+    finally:
+        mbox.flush()
+        mbox.unlock()
+        mbox.close()
+
+
+def _write_eml_zip(out_path, messages, meta):
+    """Write one .eml per message into a ZIP (path should end with .zip)."""
+    import tempfile
+    stamp = datetime.now(TZ).strftime('%Y%m%d_%H%M%S')
+    tmp = tempfile.mkdtemp(prefix='wechat_eml_')
+    try:
+        for i, msg in enumerate(messages):
+            day = (msg.get('date') or 'unknown').replace('-', '')
+            lid = msg.get('local_id') or i
+            chat_slug = re.sub(
+                r'[\\/:*?"<>|\s]+', '_',
+                str(msg.get('chat_id') or 'chat'))[:24]
+            fname = f'{day}_{chat_slug}_{lid}.eml'
+            path = os.path.join(tmp, fname)
+            # collision
+            n = 2
+            while os.path.exists(path):
+                fname = f'{day}_{chat_slug}_{lid}_{n}.eml'
+                path = os.path.join(tmp, fname)
+                n += 1
+            with open(path, 'wb') as f:
+                f.write(_msg_to_email_message(msg, meta).as_bytes())
+        # Ensure out_path ends with .zip
+        if not out_path.lower().endswith('.zip'):
+            out_path = out_path + '.zip' if '.' not in os.path.basename(out_path) \
+                else os.path.splitext(out_path)[0] + '.zip'
+        with zipfile.ZipFile(out_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for name in sorted(os.listdir(tmp)):
+                zf.write(os.path.join(tmp, name), arcname=f'wechat-eml/{name}')
+            readme = (
+                'WeChat Export · EML archive\n'
+                f'Exported: {meta.get("exported_at") or stamp}\n'
+                f'Chat: {meta.get("display") or ""}\n'
+                f'Messages: {len(messages)}\n'
+                'Open with Thunderbird / Outlook / Apple Mail (import .eml).\n'
+            )
+            zf.writestr('wechat-eml/README.txt', readme)
+    finally:
+        import shutil
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def _write_markdown(out_path, messages, meta):

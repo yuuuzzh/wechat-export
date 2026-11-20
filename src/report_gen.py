@@ -287,39 +287,57 @@ def _build_report_html(stats, out_path=None):
 {echarts_script}
 <style>
 * {{ margin:0; padding:0; box-sizing:border-box; }}
-body {{ font-family:"Microsoft YaHei",sans-serif; background:#0d1117; color:#c9d1d9; }}
-.header {{ text-align:center; padding:32px 16px; background:linear-gradient(135deg,#0d1117,#161b22); border-bottom:1px solid #30363d; }}
-.header h1 {{ font-size:26px; color:#58a6ff; margin-bottom:8px; }}
-.header .sub {{ color:#8b949e; font-size:13px; }}
-.toolbar {{ display:flex; justify-content:flex-end; max-width:1400px; margin:12px auto 0; padding:0 20px; }}
-.toolbar button {{ padding:6px 16px; background:#1c2333; border:1px solid #30363d; border-radius:6px; color:#8b949e; cursor:pointer; font-size:12px; font-family:inherit; }}
-.toolbar button.active {{ background:#1f3a5f; color:#58a6ff; border-color:#58a6ff; }}
-.toolbar button:hover {{ color:#c9d1d9; }}
+:root, body.theme-dark {{
+  --bg:#0d1117; --panel:#161b22; --panel2:#1c2333; --border:#30363d;
+  --text:#c9d1d9; --muted:#8b949e; --accent:#58a6ff; --accent2:#e94560; --footer:#484f58;
+}}
+body.theme-light {{
+  --bg:#f6f8fa; --panel:#ffffff; --panel2:#eef2f6; --border:#d0d7de;
+  --text:#1f2328; --muted:#656d76; --accent:#0969da; --accent2:#cf222e; --footer:#8c959f;
+}}
+body {{ font-family:"Microsoft YaHei","Noto Sans SC",sans-serif; background:var(--bg); color:var(--text); }}
+.header {{ text-align:center; padding:32px 16px; background:linear-gradient(135deg,var(--bg),var(--panel)); border-bottom:1px solid var(--border); }}
+.header h1 {{ font-size:26px; color:var(--accent); margin-bottom:8px; }}
+.header .sub {{ color:var(--muted); font-size:13px; }}
+.toolbar {{ display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; max-width:1400px; margin:12px auto 0; padding:0 20px; }}
+.toolbar button {{ padding:6px 16px; background:var(--panel2); border:1px solid var(--border); border-radius:6px; color:var(--muted); cursor:pointer; font-size:12px; font-family:inherit; }}
+.toolbar button.active {{ background:var(--panel); color:var(--accent); border-color:var(--accent); }}
+.toolbar button:hover {{ color:var(--text); }}
 .cards {{ display:flex; flex-wrap:wrap; gap:16px; padding:20px; max-width:1400px; margin:0 auto; }}
-.card {{ flex:1 1 200px; min-width:160px; background:#161b22; border:1px solid #30363d; border-radius:12px; padding:20px; text-align:center; }}
-.card .num {{ font-size:32px; font-weight:bold; color:#58a6ff; }}
-.card .label {{ font-size:13px; color:#8b949e; margin-top:4px; }}
+.card {{ flex:1 1 200px; min-width:160px; background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:20px; text-align:center; }}
+.card .num {{ font-size:32px; font-weight:bold; color:var(--accent); }}
+.card .label {{ font-size:13px; color:var(--muted); margin-top:4px; }}
 .tabs {{ display:flex; gap:4px; padding:0 20px; max-width:1400px; margin:0 auto; }}
-.tab {{ padding:8px 20px; background:#161b22; border:1px solid #30363d; border-bottom:none; border-radius:8px 8px 0 0; color:#8b949e; cursor:pointer; font-size:13px; }}
-.tab.active {{ background:#1c2333; color:#58a6ff; border-color:#30363d #30363d #1c2333; }}
+.tab {{ padding:8px 20px; background:var(--panel); border:1px solid var(--border); border-bottom:none; border-radius:8px 8px 0 0; color:var(--muted); cursor:pointer; font-size:13px; }}
+.tab.active {{ background:var(--panel2); color:var(--accent); border-color:var(--border) var(--border) var(--panel2); }}
 .tab-content {{ display:none; max-width:1400px; margin:0 auto; padding:16px 20px; }}
 .tab-content.active {{ display:block; }}
 .chart-row {{ display:flex; flex-wrap:wrap; gap:16px; }}
-.chart-panel {{ flex:1 1 500px; min-width:350px; background:#161b22; border:1px solid #30363d; border-radius:12px; padding:16px; }}
+.chart-panel {{ flex:1 1 500px; min-width:350px; background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px; }}
 .chart-panel.full {{ flex:1 1 100%; }}
-.chart-panel h3 {{ font-size:15px; color:#e94560; margin-bottom:12px; }}
+.chart-panel h3 {{ font-size:15px; color:var(--accent2); margin-bottom:12px; }}
 .chart {{ width:100%; height:380px; }}
 .chart.tall {{ height:500px; }}
-.footer {{ text-align:center; padding:20px; color:#484f58; font-size:12px; }}
+.footer {{ text-align:center; padding:20px; color:var(--footer); font-size:12px; }}
+@media print {{
+  body {{ background:#fff !important; color:#111 !important; }}
+  .toolbar, .tabs {{ display:none !important; }}
+  .tab-content {{ display:block !important; page-break-inside:avoid; }}
+  .chart-panel, .card {{ break-inside:avoid; box-shadow:none; border-color:#ccc; }}
+  .header {{ border-bottom:1px solid #ccc; }}
+  .chart, .chart.tall {{ height:320px !important; }}
+}}
 </style>
 </head>
-<body>
+<body class="theme-dark">
 <div class="header">
   <h1>WeChat Export · 聊天分析报告</h1>
   <div class="sub">生成时间: {s['generated_at']} · 分析 {s['total_msgs']:,} 条消息 · {s['total_chats']} 个会话</div>
 </div>
 
 <div class="toolbar">
+  <button type="button" id="btn-theme" onclick="toggleTheme()">浅色 / 打印友好</button>
+  <button type="button" id="btn-print" onclick="window.print()">打印 / 另存 PDF</button>
   <button id="btn-toggle-labels" class="active" onclick="toggleLabels()">隐藏数据标签</button>
 </div>
 
@@ -570,6 +588,20 @@ function toggleLabels() {{
     }});
     if (changed) c.setOption(opt);
   }});
+}}
+
+function toggleTheme() {{
+  var light = document.body.classList.toggle('theme-light');
+  document.body.classList.toggle('theme-dark', !light);
+  var btn = document.getElementById('btn-theme');
+  if (btn) btn.textContent = light ? '深色主题' : '浅色 / 打印友好';
+  // Force chart text colors via resize (CSS vars already applied to chrome)
+  setTimeout(resizeAll, 50);
+}}
+if (location.search.indexOf('print=1') >= 0 || location.search.indexOf('autoprint=1') >= 0) {{
+  document.body.classList.add('theme-light');
+  document.body.classList.remove('theme-dark');
+  setTimeout(function() {{ window.print(); }}, 800);
 }}
 
 window.addEventListener('resize', resizeAll);

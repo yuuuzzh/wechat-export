@@ -234,6 +234,33 @@ def _resolve_targets(all_chats, contact='', contacts=None, display_name_hint='')
     return [], fuzzy_matches
 
 
+@export_bp.route('/formats', methods=['GET'])
+def list_export_formats():
+    """GET /api/export/formats — built-in + drop-in plugin formats."""
+    builtin = [
+        {'format': 'xlsx', 'label': 'Excel'},
+        {'format': 'html', 'label': 'HTML 对话'},
+        {'format': 'txt', 'label': 'TXT'},
+        {'format': 'md', 'label': 'Markdown'},
+        {'format': 'json', 'label': 'JSON'},
+        {'format': 'csv', 'label': 'CSV'},
+        {'format': 'pgsql', 'label': 'PostgreSQL SQL'},
+        {'format': 'eml', 'label': '邮件归档 EML ZIP'},
+        {'format': 'mbox', 'label': '邮件归档 mbox'},
+        {'format': 'session-pack', 'label': '会话报告包 ZIP'},
+        {'format': 'notes-pack', 'label': '笔记包 ZIP'},
+        {'format': 'chatlab-jsonl', 'label': 'ChatLab JSONL'},
+        {'format': 'chatlab-json', 'label': 'ChatLab JSON'},
+    ]
+    plugins = []
+    try:
+        from engine.services.exporter_plugins import list_plugin_formats
+        plugins = list_plugin_formats()
+    except Exception:
+        plugins = []
+    return jsonify({'ok': True, 'builtin': builtin, 'plugins': plugins})
+
+
 @export_bp.route('/chats', methods=['GET'])
 def list_export_chats():
     """GET /api/export/chats — 供导出页勾选会话（支持 q / kind=all|group|contact）。"""
@@ -278,9 +305,9 @@ def export_chat():
       contact / contacts: 单个或多个会话 username
       keyword: 关键词（空格=AND，| =OR）
       date_start / date_end: YYYY-MM-DD
-      format: txt | html | xlsx | csv | md | json | pgsql | session-pack |
-              notes-pack | chatlab-jsonl | chatlab-json
-      merge: 多会话 txt/html 是否合并（xlsx/csv 始终合并）
+      format: txt | html | xlsx | csv | md | json | pgsql | eml | mbox |
+              session-pack | notes-pack | chatlab-jsonl | chatlab-json | <plugin>
+      merge: 多会话 txt/html 是否合并（xlsx/csv/eml/mbox 始终合并）
       include_asr: 是否带上已转写语音文字
       privacy_redact: 导出前脱敏昵称/手机号/身份证（分享演示）
       privacy: {nicknames, phones, id_cards, style: placeholder|asterisk}
@@ -295,7 +322,7 @@ def export_chat():
     fmt = (data.get('format') or 'txt').strip().lower()
     merge = data.get('merge')
     if merge is None:
-        merge = fmt in ('xlsx', 'csv', 'html', 'json', 'pgsql', 'sql')
+        merge = fmt in ('xlsx', 'csv', 'html', 'json', 'pgsql', 'sql', 'eml', 'mbox')
     from engine.services.privacy_redact import parse_privacy_options
     privacy = parse_privacy_options(data)
 
@@ -510,6 +537,51 @@ def export_chat():
                     'note': '笔记包：daily/ + attachments/（图片 .dat 尽量解密）+ manifest.json',
                     'stats': st,
                     'missing_count': st.get('missing_count') or 0,
+                })
+                return
+
+            # Drop-in Python 插件导出器
+            try:
+                from engine.services.exporter_plugins import get_plugin, run_plugin
+                plugin = get_plugin(fmt)
+            except Exception:
+                plugin = None
+            if plugin:
+                from chat_export import collect_messages
+                from datetime import datetime as _dt
+                all_msgs = []
+                for i, target in enumerate(targets):
+                    display = target.get('display_name') or target.get('username') or 'chat'
+                    push('export', '插件收集 %s…' % display,
+                         0.2 + 0.5 * i / max(len(targets), 1))
+                    msgs = collect_messages(
+                        target, start_ts=start_ts, end_ts=end_ts,
+                        keyword=keyword or None,
+                        include_asr=bool(data.get('include_asr')),
+                        display_name=display)
+                    all_msgs.extend(msgs)
+                if privacy:
+                    from chat_export import _apply_privacy
+                    all_msgs, _, _ = _apply_privacy(all_msgs, privacy, None)
+                all_msgs.sort(key=lambda m: (m.get('create_time') or 0, m.get('local_id') or 0))
+                stamp = _dt.now().strftime('%Y%m%d_%H%M%S')
+                ext = plugin.get('ext') or 'txt'
+                fname = 'plugin_%s_%s.%s' % (plugin['format'], stamp, ext)
+                out_path = os.path.join(out_dir, fname)
+                meta = {
+                    'display': '插件导出',
+                    'uname': ','.join(t.get('username') or '' for t in targets[:20]),
+                    'exported_at': _dt.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'chat_count': len(targets),
+                    'keyword': keyword or '',
+                }
+                push('export', '运行插件 %s…' % plugin['label'], 0.8)
+                run_plugin(fmt, all_msgs, meta, out_path)
+                push.done({
+                    'msg_count': len(all_msgs),
+                    'download_url': '/api/export/download/' + fname,
+                    'filename': fname,
+                    'note': '插件格式：%s（%s）' % (plugin['label'], plugin['format']),
                 })
                 return
 
@@ -747,6 +819,7 @@ def export_report():
             from report_gen import generate_report
             scope = f'{year} 年' if start_ts is not None else '全部时间'
             push('analyze', f'正在收集统计数据（{scope}）... ({decrypted_dir})', 0.2)
+            want_pdf = bool(data.get('pdf') or data.get('as_pdf'))
             out_file = generate_report(
                 decrypted_dir, start_ts=start_ts, end_ts=end_ts)
             if out_file:
@@ -755,9 +828,32 @@ def export_report():
                 web_dir = os.path.join(_DATA_ROOT, 'export', 'report')
                 os.makedirs(web_dir, exist_ok=True)
                 import shutil
-                shutil.copy2(out_file, os.path.join(web_dir, fname))
+                dest_html = os.path.join(web_dir, fname)
+                shutil.copy2(out_file, dest_html)
                 view_url = f'/api/export/report/view/{fname}'
-                push.done({'msg_count': 0, 'view_url': view_url, 'filename': fname})
+                done = {
+                    'msg_count': 0,
+                    'view_url': view_url,
+                    'print_url': view_url + '?print=1',
+                    'filename': fname,
+                    'note': '报告内可切换浅色/打印友好，并用「打印 / 另存 PDF」',
+                }
+                if want_pdf:
+                    push('analyze', '正在尝试生成 PDF（Edge/Chrome 无头）…', 0.92)
+                    from engine.services.report_pdf import html_file_to_pdf
+                    pdf_name = os.path.splitext(fname)[0] + '.pdf'
+                    pdf_path = html_file_to_pdf(dest_html, os.path.join(web_dir, pdf_name))
+                    if pdf_path:
+                        done['pdf_url'] = '/api/export/report/view/' + pdf_name
+                        done['pdf_filename'] = pdf_name
+                        done['note'] = '已生成 PDF；也可打开 HTML 用浏览器另存。'
+                    else:
+                        done['note'] = (
+                            '未检测到 Edge/Chrome，无法服务端出 PDF；'
+                            '请打开报告后点「打印 / 另存 PDF」。'
+                        )
+                        done['print_url'] = view_url + '?print=1'
+                push.done(done)
             else:
                 push.error('报告生成失败 — 解密数据目录中未找到任何消息。请确认已执行备份与解密。')
         except Exception as e:

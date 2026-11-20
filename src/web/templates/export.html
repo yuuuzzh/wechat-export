@@ -48,6 +48,8 @@
         <option value="json">JSON（消息数组）</option>
         <option value="csv">CSV 表格</option>
         <option value="pgsql">PostgreSQL SQL</option>
+        <option value="eml">邮件归档 EML ZIP（法律/个人存档）</option>
+        <option value="mbox">邮件归档 mbox</option>
         <option value="session-pack">会话报告包 ZIP（对话+词云+统计）</option>
         <option value="notes-pack">笔记包 ZIP（Obsidian / Notion / Logseq · 按日+附件）</option>
         <option value="chatlab-jsonl">ChatLab JSONL（可导入 · 断点续传）</option>
@@ -90,6 +92,8 @@
     <b>HTML</b>：对话气泡样式，导出文件内可再次页内搜索高亮。<br>
     <b>会话报告包</b>：每个会话一份 ZIP（chat.html + wordcloud.html + stats.json）。<br>
     <b>笔记包</b>：按日 Markdown + <code>attachments/</code>（图片 <code>.dat</code> 尽量解密）+ <code>manifest.json</code>，可导入 Obsidian / Logseq / Notion。<br>
+    <b>邮件归档</b>：EML ZIP / mbox，可用 Thunderbird、Outlook、Apple Mail 等法律/个人存档工具打开。<br>
+    <b>插件格式</b>：将 Python 脚本放入 <code>plugins/exporters/</code> 即可出现在下方格式列表（见示例 <code>example_jsonlines.py</code>）。<br>
     <b>隐私脱敏</b>：仅作用于导出文件，备份库不变；适合公开分享演示。<br>
     ChatLab 远程拉取请用 <a href="/pull">Pull 数据源</a>；
     语音留言请用 <a href="/voice-export">语音导出</a>。
@@ -311,6 +315,19 @@
     privCb.addEventListener('change', syncPriv);
     syncPriv();
   }
+
+  // Append drop-in plugin formats
+  fetch('/api/export/formats').then(r => r.json()).then(data => {
+    if (!data || !data.ok) return;
+    const sel = document.getElementById('cfg-format');
+    (data.plugins || []).forEach(p => {
+      if ([...sel.options].some(o => o.value === p.format)) return;
+      const opt = document.createElement('option');
+      opt.value = p.format;
+      opt.textContent = '插件 · ' + (p.label || p.format);
+      sel.appendChild(opt);
+    });
+  }).catch(() => {});
 
   // WizardPage.start 在 getBody 抛错时仍会 disable 按钮——拦截一下
   const runBtn = document.getElementById('btn-run');

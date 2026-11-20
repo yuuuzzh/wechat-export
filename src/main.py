@@ -833,8 +833,8 @@ def cmd_export(args):
                 print("失败: " + str(result.get('error') or '未知错误'))
             return
 
-        if fmt not in ('txt', 'html', 'xlsx', 'csv'):
-            print("提示: 聊天记录导出支持 txt / html / xlsx / csv / notes-pack，%s 已回退为 txt。" % fmt)
+        if fmt not in ('txt', 'html', 'xlsx', 'csv', 'md', 'json', 'pgsql', 'eml', 'mbox'):
+            print("提示: 聊天记录导出支持 txt/html/xlsx/csv/md/json/pgsql/eml/mbox/notes-pack，%s 已回退为 txt。" % fmt)
             print("      通讯录导出请用 -m contacts --format xlsx|csv|html。")
             fmt = 'txt'
 
@@ -1105,11 +1105,12 @@ def main():
     ep.add_argument('--format', '-f',
                     choices=['jsonl', 'json', 'xlsx', 'csv', 'html', 'txt',
                              'md', 'markdown', 'pgsql', 'sql',
+                             'eml', 'mbox',
                              'notes-pack', 'obsidian', 'logseq', 'notion'],
                     default=None,
                     help='输出格式：chatlab 用 jsonl/json（默认 jsonl），'
                          'contacts 用 xlsx/csv/html（默认 xlsx），'
-                         'chat 用 txt/html/xlsx/csv/md/json/pgsql/notes-pack（默认 txt）')
+                         'chat 用 txt/html/xlsx/csv/md/json/pgsql/eml/mbox/notes-pack（默认 txt）')
     ep.add_argument('--keyword', '-k',
                     help='chat 模式：按消息内容过滤（空格=AND，|=OR）')
     ep.add_argument('--no-resume', action='store_true',

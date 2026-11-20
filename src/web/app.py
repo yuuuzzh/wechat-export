@@ -213,6 +213,18 @@ def create_app(decrypted_dir: str, wxid: str = None, db_dir: str = None) -> Flas
 
     _register_blueprint(app, 'routes.backup_api', _register_backup_bp)
 
+    def _register_workspace_bp():
+        from .routes.workspace_api import workspace_bp
+        app.register_blueprint(workspace_bp)
+
+    _register_blueprint(app, 'routes.workspace_api', _register_workspace_bp)
+
+    def _register_setup_bp():
+        from .routes.setup_api import setup_bp
+        app.register_blueprint(setup_bp)
+
+    _register_blueprint(app, 'routes.setup_api', _register_setup_bp)
+
     def _register_schedule_bp():
         from .routes.schedule_api import schedule_bp
         app.register_blueprint(schedule_bp)
@@ -348,6 +360,10 @@ def create_app(decrypted_dir: str, wxid: str = None, db_dir: str = None) -> Flas
         return render_template('index.html')
 
     # Wizard pages
+    @app.route('/setup')
+    def setup_page():
+        return render_template('setup.html')
+
     @app.route('/backup')
     def backup_page():
         return render_template('backup.html')

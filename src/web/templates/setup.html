@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}首次向导 — WeChat Export{% endblock %}
+{% block content %}
+<a href="/" class="back-link">← 返回仪表盘</a>
+<h2 class="page-title">首次使用向导</h2>
+<p class="page-desc">按顺序完成：检测微信 → 提钥 → 备份 → 打开查看器。已完成的步骤可跳过。</p>
+
+<div id="setup-status" class="config-panel" style="margin-bottom:16px">
+  <div id="setup-summary" style="color:var(--px-muted);font-size:13px">正在检查环境…</div>
+</div>
+
+<ol id="setup-steps" style="list-style:none;padding:0;margin:0 0 24px 0;display:flex;flex-direction:column;gap:12px"></ol>
+
+<div class="form-row" style="gap:12px;flex-wrap:wrap">
+  <a class="btn" href="/backup">打开备份页</a>
+  <a class="btn" href="/keyscan">打开提钥页</a>
+  <a class="btn btn-primary" id="btn-open-viewer" href="/chat" style="display:none">打开聊天查看器</a>
+  <a class="btn" href="/export" id="btn-open-export" style="display:none">去导出</a>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(async function () {
+  const stepsEl = document.getElementById('setup-steps');
+  const summary = document.getElementById('setup-summary');
+  const mapLink = {
+    detect: '/backup',
+    keys: '/keyscan',
+    backup: '/backup',
+    viewer: '/chat',
+  };
+  try {
+    const r = await fetch('/api/setup/status');
+    const data = await r.json();
+    if (!data.ok) throw new Error('status failed');
+    const running = data.wechat_running ? '微信进程：运行中' : '微信进程：未检测到（提钥时请先登录微信）';
+    summary.textContent = (data.complete ? '环境已就绪，可直接使用。' : '请按未完成步骤继续。') + ' · ' + running;
+    stepsEl.innerHTML = '';
+    (data.steps || []).forEach((s, i) => {
+      const li = document.createElement('li');
+      li.className = 'config-panel';
+      li.style.margin = '0';
+      const href = mapLink[s.id] || '/';
+      li.innerHTML =
+        '<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">' +
+        '<div><strong>' + (i + 1) + '. ' + s.title + '</strong>' +
+        '<div style="font-size:12px;color:var(--px-muted);margin-top:4px">' + (s.hint || '') + '</div></div>' +
+        '<div>' + (s.done
+          ? '<span style="color:var(--px-accent,#3d8)">已完成</span>'
+          : '<a class="btn btn-primary" href="' + href + '">去完成</a>') +
+        '</div></div>';
+      stepsEl.appendChild(li);
+    });
+    if (data.complete) {
+      document.getElementById('btn-open-viewer').style.display = '';
+      document.getElementById('btn-open-export').style.display = '';
+    }
+  } catch (e) {
+    summary.textContent = '无法读取向导状态，请手动打开「备份」与「提钥」。';
+  }
+})();
+</script>
+{% endblock %}

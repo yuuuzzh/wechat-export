@@ -220,6 +220,14 @@ def backup_versions_activate():
         return jsonify(result), 400
     # Keep live Flask app in sync (same as backup/run success path)
     current_app.config['DECRYPTED_DIR'] = result['path']
+    try:
+        from engine.services.media import resolve_account_dir
+        use_wxid = result.get('wxid') or wxid or ''
+        current_app.config['WXID'] = resolve_account_dir(result['path'], use_wxid)
+        result['wxid'] = current_app.config.get('WXID')
+    except Exception:
+        if result.get('wxid'):
+            current_app.config['WXID'] = result['wxid']
     result['decrypted_dir'] = result['path']
     return jsonify(result)
 

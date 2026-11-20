@@ -33,7 +33,9 @@
 |-----------|----------------------|
 | 数据边界 | 默认本机闭环；备份后可在微信关闭时继续查与导出 |
 | 可复现流水线 | 一键备份（可增量）→ 查看 / 搜索 / 报告 → 多格式导出 |
-| 导出与对接 | TXT / HTML / Excel / CSV / Markdown / JSON / PGSQL / 会话报告包 / 笔记包 / ChatLab；本地 HTTP API（`/api/openapi.json`、`/swagger`） |
+| 导出与对接 | TXT / HTML / Excel / CSV / Markdown / JSON / PGSQL / EML·mbox / 会话报告包 / 笔记包 / ChatLab / 插件脚本；本地 HTTP API（`/api/openapi.json`、`/swagger`） |
+| 工作区与向导 | 多账号备份根目录一键切换；首次向导（检测微信 → 提钥 → 备份 → 查看器） |
+| 报告产品化 | 综合报告深色/浅色打印模板；一键 PDF（本机 Edge/Chrome）或浏览器另存 |
 | 工程形态 | 开源 Python + 单文件 `wechat_exp.exe`，无「必须自备原生解密插件」才能跑主流程 |
 | 不做的事 | 不承诺实时防撤回、桌面弹窗、写回微信库等挂钩能力（风险高、与本产品定位不符） |
 

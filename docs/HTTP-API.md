@@ -151,9 +151,15 @@ Skill 文档：`docs/skill/wechat-export-reader/SKILL.md`。本项目**不提供
 }
 ```
 
-`format` 支持：`txt` · `html` · `xlsx` · `csv` · `md` · `json` · `pgsql` · `session-pack` · `notes-pack` · `chatlab-jsonl` · `chatlab-json`。
+`format` 支持：`txt` · `html` · `xlsx` · `csv` · `md` · `json` · `pgsql` · `eml` · `mbox` · `session-pack` · `notes-pack` · `chatlab-jsonl` · `chatlab-json` · 以及 `plugins/exporters/*.py` 注册的插件 id。
 
-`notes-pack`：按日 Markdown + `attachments/` 的 ZIP（Obsidian / Logseq / Notion 可导入）；别名 `obsidian` / `logseq` / `notion`。包内含 `manifest.json`（及可选 `missing.csv`）；图片若为微信加密 `.dat` 会尽量解密为 jpg/png 再写入附件目录。
+- `eml`：每条消息一个 `.eml`，打成 ZIP（Thunderbird / Outlook / Apple Mail）。
+- `mbox`：Unix mailbox 单文件。
+- `notes-pack`：按日 Markdown + `attachments/` 的 ZIP（Obsidian / Logseq / Notion）；别名 `obsidian` / `logseq` / `notion`。包内含 `manifest.json`（及可选 `missing.csv`）；图片 `.dat` 尽量解密为 jpg/png。
+- `GET /api/export/formats`：内置 + 插件格式列表。
+- `GET /api/workspace` · `POST /api/workspace/switch`：多账号工作区。
+- `GET /api/setup/status`：首次向导进度。
+- `POST /api/export/report` 可传 `pdf: true` 尝试无头浏览器出 PDF。
 
 **隐私脱敏**（`privacy_redact: true`）：仅改写导出文件，不修改本机备份。昵称可映射为「联系人甲 / 示例群聊」（`style: placeholder`）或星号打码（`asterisk`）；正文中的大陆手机号、15/18 位身份证号批量打码。文件名会加 `脱敏_` 前缀。
 
