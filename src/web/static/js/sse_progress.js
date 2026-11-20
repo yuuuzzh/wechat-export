@@ -16,13 +16,13 @@ class SseProgress {
     this.abortController = new AbortController();
 
     // We use fetch + ReadableStream to support POST with SSE
+    const headers = { 'Accept': 'text/event-stream' };
+    const hasBody = this.body != null && this.method.toUpperCase() !== 'GET';
+    if (hasBody) headers['Content-Type'] = 'application/json';
     fetch(this.url, {
       method: this.method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'text/event-stream',
-      },
-      body: this.body ? JSON.stringify(this.body) : null,
+      headers: headers,
+      body: hasBody ? JSON.stringify(this.body) : undefined,
       signal: this.abortController.signal,
     }).then(async (response) => {
       if (!response.ok) {

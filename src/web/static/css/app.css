@@ -1722,3 +1722,100 @@ body:has(#cleanup-app) #content { max-width: none; padding: 0; margin: 0; }
 
 /* Soften emoji in pixel chrome */
 .card-icon, .placeholder-icon { image-rendering: auto; }
+
+/* === Flow callouts / backup page sections / global job chip === */
+.flow-callout {
+  background: var(--px-panel);
+  border: var(--border-w) solid var(--px-border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin: 0 0 20px 0;
+  box-shadow: var(--elev);
+  font-size: 13px;
+  color: var(--px-text);
+  line-height: 1.65;
+}
+.flow-callout-warn {
+  border-color: var(--px-warn);
+  background: color-mix(in srgb, var(--px-warn) 12%, var(--px-panel));
+}
+.flow-callout-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--px-warn);
+  margin: 0 0 8px 0;
+}
+.flow-callout a { color: var(--px-gold); }
+
+.flow-section {
+  margin: 0 0 22px 0;
+}
+.flow-section-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 0 10px 0;
+}
+.flow-step-badge {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: #1a1200;
+  background: var(--px-gold);
+  border: 2px solid var(--px-border);
+  box-shadow: var(--elev-sm);
+}
+.flow-section-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--px-text);
+}
+.flow-section-desc {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--px-muted);
+}
+
+.dashboard-card-primary {
+  border-color: var(--px-gold);
+  box-shadow: var(--elev);
+}
+.dashboard-card-primary::after { opacity: 1; }
+
+.backup-job-chip {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  margin-right: 8px;
+  text-decoration: none;
+  color: var(--px-text);
+  background: var(--px-panel);
+  border: 2px solid var(--px-orange);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-family: var(--font-display);
+  max-width: 220px;
+}
+.backup-job-chip:hover { color: var(--px-gold); border-color: var(--px-gold); }
+.backup-job-chip-label { color: var(--px-orange); white-space: nowrap; }
+.backup-job-chip-bar {
+  flex: 1;
+  min-width: 48px;
+  height: 6px;
+  background: var(--px-bg);
+  border: 1px solid var(--px-border);
+  overflow: hidden;
+}
+.backup-job-chip-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--px-orange);
+  transition: width 0.2s ease;
+}
+.backup-job-chip-pct { color: var(--px-muted); white-space: nowrap; }

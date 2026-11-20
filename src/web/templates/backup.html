@@ -2,55 +2,109 @@
 {% block title %}一键备份 — WeChat Export{% endblock %}
 {% block content %}
 <a href="/" class="back-link">← 返回仪表盘</a>
-<h2 style="margin:0 0 4px 0">📦 一键备份</h2>
-<p style="color:var(--px-muted);font-size:12px;margin:0 0 20px 0">扫描 → 解密 → 迁移媒体 → 构建索引 · 默认增量：未变更的库与媒体直接复用上次备份 · 每次写入时间戳目录（可<a href="/versions" style="color:inherit">对比 / 回滚</a>）· <a href="/schedule" style="color:inherit">每天增量定时任务</a></p>
+<h2 class="page-title" style="margin:0 0 4px 0">📦 一键备份</h2>
+<p class="page-desc" style="margin:0 0 16px 0">本工具内的本地备份流水线 · 扫描 → 解密 → 迁移媒体 → 构建索引 · 默认增量</p>
 
-<div class="steps-bar" id="steps-bar">
-  <span class="step-item active" data-stage="scan"><span>①</span> 扫描账号</span>
-  <span class="step-arrow">→</span>
-  <span class="step-item" data-stage="decrypt"><span>②</span> 解密数据库</span>
-  <span class="step-arrow">→</span>
-  <span class="step-item" data-stage="migrate"><span>③</span> 迁移媒体</span>
-  <span class="step-arrow">→</span>
-  <span class="step-item" data-stage="index"><span>④</span> 构建索引</span>
-</div>
+<aside id="first-backup-tip" class="flow-callout flow-callout-warn" role="note">
+  <div class="flow-callout-title">首次必做：请用本页的「开始备份」</div>
+  <p style="margin:0 0 8px 0">
+    这是 <b>WeChat Export 平台内</b>的一键备份，用来解密并生成本地可读数据；
+    <b>不是</b>微信客户端里「设置 → 聊天 → 备份与恢复」的官方备份。
+  </p>
+  <ul style="margin:0;padding-left:18px;line-height:1.7">
+    <li>微信自带备份无法被本工具直接读取，走错入口会白等。</li>
+    <li>请先点下方「自动检测」确认数据目录，再点「开始备份」。</li>
+    <li>备份可在后台继续；离开本页后右上角会显示进度，随时可回来查看。</li>
+  </ul>
+  <button type="button" id="btn-dismiss-tip" class="btn btn-secondary" style="margin-top:12px;font-size:11px">知道了，不再提示</button>
+</aside>
 
-<div class="config-panel">
-  <div class="form-row">
-    <div style="flex:2"><label>微信数据目录 (db_storage)</label><input id="cfg-db-dir" placeholder="例如: D:\xwechat_files\wxid_xxx\db_storage"></div>
-    <div style="flex:2"><label>备份输出目录</label><input id="cfg-output" placeholder="留空则自动：backup\YYYY-MM-DD_HHMMSS"></div>
-    <div><label>&nbsp;</label><button id="btn-run" class="btn btn-primary">开始备份</button></div>
-  </div>
-  <div class="form-row" style="margin-top:8px">
-    <div style="flex:1"><label>起始日期</label><input type="date" id="cfg-date-from"></div>
-    <div style="flex:1"><label>截止日期</label><input type="date" id="cfg-date-to"></div>
-    <div style="flex:1"><label>快速选择</label>
-      <select id="cfg-days" style="width:100%;padding:8px 10px;border:2px solid var(--px-border);border-radius:var(--radius-sm);background:var(--px-input-bg);color:var(--px-text);font-size:13px">
-        <option value="30" selected>最近 30 天</option>
-        <option value="7">最近 7 天</option>
-        <option value="90">最近 90 天</option>
-        <option value="365">最近 1 年</option>
-        <option value="0">全部记录</option>
-      </select>
+<section class="flow-section">
+  <div class="flow-section-head">
+    <span class="flow-step-badge">1</span>
+    <div>
+      <h3 class="flow-section-title">确认微信数据目录</h3>
+      <p class="flow-section-desc">自动检测本机账号；多账号时点选即可填入</p>
     </div>
   </div>
-  <label class="check-row" style="margin-top:10px">
-    <input type="checkbox" id="cfg-incremental" checked>
-    <span>增量备份（复用上次未变更的数据库与媒体，更快）</span>
-  </label>
-  <div style="margin-top:8px">
-    <button id="btn-detect" class="btn btn-secondary" style="font-size:11px">自动检测微信目录</button>
-    <button id="btn-deep" class="btn btn-secondary" style="font-size:11px">🔍 深度搜索</button>
-    <button id="btn-use-dir" class="btn btn-secondary" style="font-size:11px">使用该目录</button>
+  <div class="config-panel" style="margin-bottom:0">
+    <div class="form-row">
+      <div style="flex:2"><label>微信数据目录 (db_storage)</label><input id="cfg-db-dir" placeholder="例如: D:\xwechat_files\wxid_xxx\db_storage"></div>
+    </div>
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+      <button id="btn-detect" class="btn btn-secondary" style="font-size:11px">自动检测微信目录</button>
+      <button id="btn-deep" class="btn btn-secondary" style="font-size:11px">🔍 深度搜索</button>
+      <button id="btn-use-dir" class="btn btn-secondary" style="font-size:11px">使用该目录</button>
+    </div>
+    <div class="form-row" style="margin-top:8px">
+      <div style="flex:4"><label>检测到的数据目录（选择即填入上面的输入框）</label>
+        <select id="cfg-db-dir-list" style="width:100%;padding:8px 10px;border:1px solid #2f6b54;border-radius:0;background:#0a1612;color:#e8f7ee;font-size:13px"></select></div>
+    </div>
+    <div id="dir-hint" style="color:#8fb9a6;font-size:12px;margin-top:8px;line-height:1.8">
+      💡 找不到时点「深度搜索」（最长 45 秒）；或在微信「设置 → 文件管理 → 打开文件夹」里查看，
+      把 <code>xwechat_files\&lt;账号&gt;\db_storage</code> 粘贴后点「使用该目录」。
+    </div>
   </div>
-  <div class="form-row" style="margin-top:8px">
-    <div style="flex:4"><label>检测到的数据目录（选择即填入上面的输入框）</label>
-      <select id="cfg-db-dir-list" style="width:100%;padding:8px 10px;border:1px solid #2f6b54;border-radius:0;background:#0a1612;color:#e8f7ee;font-size:13px"></select></div>
+</section>
+
+<section class="flow-section">
+  <div class="flow-section-head">
+    <span class="flow-step-badge">2</span>
+    <div>
+      <h3 class="flow-section-title">设置备份范围</h3>
+      <p class="flow-section-desc">日期与增量选项 · 输出目录可留空自动生成</p>
+    </div>
   </div>
-  <div id="dir-hint" style="color:#8fb9a6;font-size:12px;margin-top:8px;line-height:1.8">
-    💡 找不到数据目录时点「🔍 深度搜索」（最长 45 秒）；也可以在微信「设置 → 文件管理 → 打开文件夹」里查看，
-    把 <code>xwechat_files\&lt;账号&gt;\db_storage</code> 粘贴到输入框后点「使用该目录」。</div>
-</div>
+  <div class="config-panel" style="margin-bottom:0">
+    <div class="form-row">
+      <div style="flex:2"><label>备份输出目录</label><input id="cfg-output" placeholder="留空则自动：backup\YYYY-MM-DD_HHMMSS"></div>
+    </div>
+    <div class="form-row" style="margin-top:8px">
+      <div style="flex:1"><label>起始日期</label><input type="date" id="cfg-date-from"></div>
+      <div style="flex:1"><label>截止日期</label><input type="date" id="cfg-date-to"></div>
+      <div style="flex:1"><label>快速选择</label>
+        <select id="cfg-days" style="width:100%;padding:8px 10px;border:2px solid var(--px-border);border-radius:var(--radius-sm);background:var(--px-input-bg);color:var(--px-text);font-size:13px">
+          <option value="30" selected>最近 30 天</option>
+          <option value="7">最近 7 天</option>
+          <option value="90">最近 90 天</option>
+          <option value="365">最近 1 年</option>
+          <option value="0">全部记录</option>
+        </select>
+      </div>
+    </div>
+    <label class="check-row" style="margin-top:10px">
+      <input type="checkbox" id="cfg-incremental" checked>
+      <span>增量备份（复用上次未变更的数据库与媒体，更快）</span>
+    </label>
+    <p style="margin:10px 0 0;font-size:12px;color:var(--px-muted);line-height:1.6">
+      每次写入时间戳目录，可之后在
+      <a href="/versions" style="color:inherit">备份版本</a> 对比 / 回滚，或设置
+      <a href="/schedule" style="color:inherit">每天增量定时任务</a>。
+    </p>
+  </div>
+</section>
+
+<section class="flow-section">
+  <div class="flow-section-head">
+    <span class="flow-step-badge">3</span>
+    <div>
+      <h3 class="flow-section-title">开始备份</h3>
+      <p class="flow-section-desc">任务在后台异步执行，可切换到其他菜单，完成前右上角会显示进度</p>
+    </div>
+  </div>
+  <div class="steps-bar" id="steps-bar">
+    <span class="step-item active" data-stage="scan"><span>①</span> 扫描账号</span>
+    <span class="step-arrow">→</span>
+    <span class="step-item" data-stage="decrypt"><span>②</span> 解密数据库</span>
+    <span class="step-arrow">→</span>
+    <span class="step-item" data-stage="migrate"><span>③</span> 迁移媒体</span>
+    <span class="step-arrow">→</span>
+    <span class="step-item" data-stage="index"><span>④</span> 构建索引</span>
+  </div>
+  <div style="margin:0 0 12px 0">
+    <button id="btn-run" class="btn btn-primary">开始备份</button>
+  </div>
+</section>
 
 <div id="progress-container" class="progress-panel" style="display:none">
   <div class="progress-bar-outer"><div id="progress-bar" class="progress-bar-inner" style="width:0%"></div></div>
@@ -68,10 +122,26 @@
 <script src="{{ url_for('static', filename='js/wizard.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dbdir.js') }}"></script>
 <script>
+(function () {
+  const TIP_KEY = 'wechat-export-backup-tip-dismissed';
+  const tip = document.getElementById('first-backup-tip');
+  try {
+    if (localStorage.getItem(TIP_KEY) === '1' && tip) tip.style.display = 'none';
+  } catch (e) { /* ignore */ }
+  const dismissBtn = document.getElementById('btn-dismiss-tip');
+  if (dismissBtn) {
+    dismissBtn.addEventListener('click', () => {
+      try { localStorage.setItem(TIP_KEY, '1'); } catch (e) { /* ignore */ }
+      if (tip) tip.style.display = 'none';
+    });
+  }
+})();
+
 const page = new WizardPage({
   formId: 'wizard-form',
   runBtnId: 'btn-run',
   apiUrl: '/api/backup/run',
+  jobStorageKey: 'wechat-export-backup-job',
   steps: ['scan', 'decrypt', 'migrate', 'index'],
   getBody: () => {
     const dateFrom = document.getElementById('cfg-date-from').value;
@@ -91,6 +161,26 @@ const page = new WizardPage({
     return body;
   },
 });
+
+// If a backup is already running, reattach instead of starting a duplicate.
+const _origStart = page.start.bind(page);
+page.start = async function () {
+  try {
+    const res = await fetch('/api/backup/job');
+    const data = await res.json();
+    if (data && data.job && data.job.running && data.job.id) {
+      this.rememberJobId(data.job.id);
+      this.runBtn.disabled = true;
+      this.progressContainer.style.display = 'block';
+      this.updateProgress(data.job.progress || 0, data.job.detail || '备份进行中…');
+      if (data.job.stage) this.setActiveStep(data.job.stage);
+      this.appendLog('检测到后台备份仍在进行，已重新接入进度', 'ok');
+      this.attachJob('/api/backup/job/' + encodeURIComponent(data.job.id) + '/events');
+      return;
+    }
+  } catch (e) { /* fall through to normal start */ }
+  _origStart();
+};
 
 // Override showResult to display stats
 const origShowResult = page.showResult.bind(page);
@@ -174,7 +264,7 @@ page.showSelectDialog = function(accounts) {
     if (progressEl) {
       progressEl.parentNode.insertBefore(container, progressEl);
     } else {
-      document.querySelector('.config-panel').after(container);
+      document.querySelector('.flow-section').after(container);
     }
   }
   let html = '<h3 style="margin:0 0 4px 0;color:#e94560">检测到多个微信账号</h3>';
@@ -237,5 +327,10 @@ document.getElementById('btn-detect').addEventListener('click', () => {
   });
   sse.start();
 });
+
+// Resume async backup if user navigated away mid-run
+if (typeof resumeBackupJobIfAny === 'function') {
+  resumeBackupJobIfAny(page);
+}
 </script>
 {% endblock %}

@@ -15,7 +15,8 @@ if getattr(sys, 'frozen', False):
 else:
     _DATA_ROOT = os.path.normpath(os.path.join(_BASE, '..'))
 
-from web.sse import create_sse_progress, sse_response
+from web.sse import create_sse_progress, sse_response, job_sse_generator
+from web.job_store import backup_jobs
 
 backup_bp = Blueprint('backup_api', __name__, url_prefix='/api/backup')
 _stdout_lock = threading.Lock()
@@ -36,9 +37,35 @@ def _safe_path(user_input: str) -> str:
     return os.path.realpath(os.path.abspath(user_input))
 
 
+@backup_bp.route('/job', methods=['GET'])
+def backup_job_status():
+    """GET /api/backup/job — Current / latest backup job snapshot (for resume UI)."""
+    job_id = (request.args.get('id') or '').strip()
+    job = backup_jobs.get(job_id) if job_id else backup_jobs.current('backup')
+    if not job:
+        return jsonify({'ok': True, 'job': None})
+    return jsonify({'ok': True, 'job': job.snapshot()})
+
+
+@backup_bp.route('/job/<job_id>/events', methods=['GET'])
+def backup_job_events(job_id: str):
+    """GET /api/backup/job/<id>/events — Reattach SSE to an existing backup job."""
+    job = backup_jobs.get(job_id)
+    if not job:
+        push, gen = create_sse_progress()
+        push.error(f'找不到备份任务 {job_id}（可能已过期或服务已重启）')
+        return sse_response(gen)
+    return sse_response(job_sse_generator(job, replay_logs=True))
+
+
 @backup_bp.route('/run', methods=['POST'])
 def backup_run():
-    """POST /api/backup/run — Full backup pipeline."""
+    """POST /api/backup/run — Full backup pipeline (async job + SSE).
+
+    Progress is stored in ``backup_jobs`` so navigating away no longer stalls
+    the worker. Clients may disconnect and later resume via
+    ``GET /api/backup/job`` + ``GET /api/backup/job/<id>/events``.
+    """
     data = request.get_json(silent=True) or {}
     db_dir = data.get('db_dir') or current_app.config.get('DB_DIR', '')
     if data.get('output_dir'):
@@ -66,6 +93,11 @@ def backup_run():
             end_date = _dt.datetime.now().strftime('%Y-%m-%d')
             start_date = (_dt.datetime.now() - _dt.timedelta(days=int(days))).strftime('%Y-%m-%d')
 
+    active = backup_jobs.active('backup')
+    if active:
+        # Reattach instead of starting a second concurrent backup.
+        return sse_response(job_sse_generator(active, replay_logs=True))
+
     # Auto-detect WeChat data directory if not provided or invalid
     if not db_dir or not os.path.isdir(db_dir):
         try:
@@ -90,7 +122,8 @@ def backup_run():
         push.error(_dir_hint())
         return sse_response(gen)
 
-    push, gen = create_sse_progress()
+    job = backup_jobs.create('backup')
+    job.progress_event('scan', '正在准备备份…', 0.01)
     flask_app = current_app._get_current_object()
 
     def _run():
@@ -98,7 +131,7 @@ def backup_run():
         from engine.config_file import set_backup_data_dir
 
         def _progress(stage, detail, progress):
-            push(stage, detail, progress)
+            job.progress_event(stage, detail, progress)
 
         try:
             result = run_backup(
@@ -113,12 +146,12 @@ def backup_run():
                     set_backup_data_dir(output_dir, wxid=result.get('wxid', ''))
                     with flask_app.app_context():
                         flask_app.config['DECRYPTED_DIR'] = output_dir
-            push.done(result)
+            job.mark_done(result)
         except Exception as e:
-            push.error(str(e))
+            job.mark_error(str(e))
 
-    threading.Thread(target=_run, daemon=True).start()
-    return sse_response(gen)
+    threading.Thread(target=_run, daemon=True, name=f'backup-{job.id}').start()
+    return sse_response(job_sse_generator(job, replay_logs=False))
 
 
 @backup_bp.route('/versions', methods=['GET'])

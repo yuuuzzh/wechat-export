@@ -25,6 +25,8 @@ class WizardPage {
     this.sse = null;
     this.currentStage = '';
     this._selectedDisplayName = '';
+    this.jobId = null;
+    this.jobStorageKey = options.jobStorageKey || '';
     this.bindEvents();
   }
 
@@ -49,6 +51,7 @@ class WizardPage {
       this._selectedDisplayName = '';
     }
 
+    if (this.sse) this.sse.stop();
     this.sse = new SseProgress(this.apiUrl, {
       method: this.method,
       body: body,
@@ -60,7 +63,32 @@ class WizardPage {
     this.sse.start();
   }
 
+  rememberJobId(jobId) {
+    if (!jobId) return;
+    this.jobId = jobId;
+    if (this.jobStorageKey) {
+      try { sessionStorage.setItem(this.jobStorageKey, jobId); } catch (e) { /* ignore */ }
+    }
+  }
+
+  clearJobId() {
+    this.jobId = null;
+    if (this.jobStorageKey) {
+      try { sessionStorage.removeItem(this.jobStorageKey); } catch (e) { /* ignore */ }
+    }
+  }
+
   handleProgress(data) {
+    if (data && data.job_id) this.rememberJobId(data.job_id);
+    if (data && data.replay) {
+      // Replayed history: update bar/stage, skip flooding the log console.
+      this.updateProgress(data.progress || 0, data.detail || '');
+      if (data.stage && data.stage !== this.currentStage) {
+        this.currentStage = data.stage;
+        this.setActiveStep(data.stage);
+      }
+      return;
+    }
     this.updateProgress(data.progress || 0, data.detail || '');
     if (data.stage && data.stage !== this.currentStage) {
       this.currentStage = data.stage;
@@ -71,6 +99,7 @@ class WizardPage {
   }
 
   handleDone(data) {
+    if (data && data.job_id) this.rememberJobId(data.job_id);
     this.updateProgress(1.0, '完成');
     const result = data.result || data;
     const hasErrors = result && result.errors && result.errors.length > 0;
@@ -82,11 +111,34 @@ class WizardPage {
     this.showResult(result);
     this.runBtn.disabled = false;
     this.markAllStepsDone();
+    this.clearJobId();
   }
 
   handleError(err) {
     this.appendLog('✗ ' + err.message, 'error');
     this.runBtn.disabled = false;
+    this.clearJobId();
+  }
+
+  /**
+   * Reattach to an existing async job (e.g. backup still running after nav away).
+   * @param {string} eventsUrl SSE endpoint for the job
+   */
+  attachJob(eventsUrl) {
+    if (!eventsUrl) return;
+    this.runBtn.disabled = true;
+    this.progressContainer.style.display = 'block';
+    this.resultContainer.style.display = 'none';
+    if (this.sse) this.sse.stop();
+    this.sse = new SseProgress(eventsUrl, {
+      method: 'GET',
+      body: null,
+      onProgress: (data) => this.handleProgress(data),
+      onDone: (data) => this.handleDone(data),
+      onError: (err) => this.handleError(err),
+      onSelect: (data) => this.handleSelect(data),
+    });
+    this.sse.start();
   }
 
   handleSelect(data) {
