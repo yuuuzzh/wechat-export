@@ -507,8 +507,9 @@ def export_chat():
                     'msg_count': st.get('msg_count') or 0,
                     'download_url': '/api/export/download/' + result['filename'],
                     'filename': result['filename'],
-                    'note': '笔记包：daily/ 按日 Markdown + attachments/ 附件（Obsidian/Logseq/Notion）',
+                    'note': '笔记包：daily/ + attachments/（图片 .dat 尽量解密）+ manifest.json',
                     'stats': st,
+                    'missing_count': st.get('missing_count') or 0,
                 })
                 return
 

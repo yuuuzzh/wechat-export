@@ -192,7 +192,7 @@
 | **笔记包 ZIP** | 按日 Markdown（`daily/`）+ `attachments/` + 会话索引；可导入 Obsidian / Logseq / Notion |
 | ChatLab JSONL / JSON | 导入 ChatLab；支持关键词过滤；JSONL 可断点续传 |
 
-**笔记包**：导出 ZIP 解压后按包内 `README.md` 导入。能解析到的本地图片/视频/语音会复制进当日附件目录；找不到的仍保留 `[图片]` 等文字占位（可先做媒体完整性补迁）。
+**笔记包**：导出 ZIP 解压后按包内 `README.md` 导入。能解析到的本地图片/视频/语音会复制进当日附件目录；微信加密 `.dat` 图片尽量解密为 jpg/png。找不到或解密失败的记入 `manifest.json` / `missing.csv`，正文仍保留 `[图片]` 等占位。CLI：`python -m main export -m chat -f notes-pack --chat 关键词`。
 
 ![导出页](screenshots/08-export-page-masked.png)  
 *图 5：多选会话 · 关键词 · 多格式（含会话报告包）*

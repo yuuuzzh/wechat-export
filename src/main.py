@@ -796,15 +796,48 @@ def cmd_export(args):
             _print_missing_dir(decrypted)
             return
 
-        # 聊天记录：txt / html / xlsx / csv；通讯录另用 -m contacts
+        # 聊天记录：txt / html / xlsx / csv / notes-pack；通讯录另用 -m contacts
         fmt = (getattr(args, 'format', None) or 'txt').strip().lower()
+        out_dir = args.output or os.path.join(_project_root(), 'export')
+        keyword = getattr(args, 'keyword', None)
+
+        if fmt in ('notes-pack', 'notes_pack', 'obsidian', 'logseq', 'notion'):
+            from engine.services.notes_pack import export_notes_for_dir
+            print("=" * 56)
+            print("  笔记包导出（Obsidian / Logseq / Notion）")
+            print("=" * 56)
+            print("  解密目录: " + str(decrypted))
+            print("  输出目录: " + str(out_dir))
+            if getattr(args, 'chat', None):
+                print("  会话过滤: " + str(args.chat))
+            if keyword:
+                print("  关键词: " + str(keyword))
+            print()
+            result = export_notes_for_dir(
+                decrypted, out_dir,
+                name_filter=getattr(args, 'chat', None),
+                keyword=keyword,
+                include_asr=bool(getattr(args, 'include_asr', False)),
+                print_fn=print,
+            )
+            print()
+            if result.get('ok'):
+                st = result.get('stats') or {}
+                print("完成: %s（消息 %s · 附件 %s · 缺失 %s）" % (
+                    result.get('filename'),
+                    st.get('msg_count', 0),
+                    st.get('attach_count', 0),
+                    st.get('missing_count', 0),
+                ))
+            else:
+                print("失败: " + str(result.get('error') or '未知错误'))
+            return
+
         if fmt not in ('txt', 'html', 'xlsx', 'csv'):
-            print("提示: 聊天记录导出支持 txt / html / xlsx / csv，%s 已回退为 txt。" % fmt)
+            print("提示: 聊天记录导出支持 txt / html / xlsx / csv / notes-pack，%s 已回退为 txt。" % fmt)
             print("      通讯录导出请用 -m contacts --format xlsx|csv|html。")
             fmt = 'txt'
 
-        out_dir = args.output or os.path.join(_project_root(), 'export')
-        keyword = getattr(args, 'keyword', None)
         print("=" * 56)
         print("  聊天记录导出")
         print("=" * 56)
@@ -1071,11 +1104,12 @@ def main():
                          'chatlab = 导出 ChatLab 标准格式，支持断点续传）')
     ep.add_argument('--format', '-f',
                     choices=['jsonl', 'json', 'xlsx', 'csv', 'html', 'txt',
-                             'md', 'markdown', 'pgsql', 'sql'],
+                             'md', 'markdown', 'pgsql', 'sql',
+                             'notes-pack', 'obsidian', 'logseq', 'notion'],
                     default=None,
                     help='输出格式：chatlab 用 jsonl/json（默认 jsonl），'
                          'contacts 用 xlsx/csv/html（默认 xlsx），'
-                         'chat 用 txt/html/xlsx/csv/md/json/pgsql（默认 txt）')
+                         'chat 用 txt/html/xlsx/csv/md/json/pgsql/notes-pack（默认 txt）')
     ep.add_argument('--keyword', '-k',
                     help='chat 模式：按消息内容过滤（空格=AND，|=OR）')
     ep.add_argument('--no-resume', action='store_true',
