@@ -79,6 +79,32 @@ Host: 127.0.0.1:5000
 
 ---
 
+## 群聊日报 / 沉默成员
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET/POST | `/api/group/report` | 任意日期范围的群聊日报（确定性统计，无 AI） |
+| GET/POST | `/api/group/report/html` | 同上，返回可下载 HTML |
+| GET | `/api/group/<chat_id>/member-stats` | 发言 / 沉默成员 |
+
+参数：`chat`（群 username 或显示名）· `preset=today\|yesterday\|7d\|30d\|custom` · `start_date` / `end_date`（custom 时）。
+
+返回概览、发言排行、热力、关键词、文本摘录，以及 `speaking.silent_members`（含 `limitations`）。页面：`/group`。
+
+---
+
+## Agent / Reader Skill（只读）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/health` | 备份是否就绪、服务时间、Skill 版本 |
+| GET | `/api/capabilities` | 能力目录；明确列出不支持的发送类能力 |
+| GET | `/api/skill/wechat-export-reader` | 返回 `SKILL.md` 全文（供 Agent 安装） |
+
+Skill 文档：`docs/skill/wechat-export-reader/SKILL.md`。本项目**不提供**发微信 / 进程注入能力。
+
+---
+
 ## 跨年对比
 
 | 方法 | 路径 | 说明 |

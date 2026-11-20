@@ -1,26 +1,69 @@
 {% extends "base.html" %}
-{% block title %}群聊画像 — WeChat Export{% endblock %}
+{% block title %}群聊画像 / 日报 — WeChat Export{% endblock %}
 {% block content %}
 <a href="/" class="back-link">← 返回仪表盘</a>
-<h2 style="margin:0 0 4px 0">群聊画像</h2>
-<p style="color:var(--px-muted);font-size:12px;margin:0 0 20px 0">选定一个群：成员发言排行、活跃时段、媒体占比</p>
+<h2 class="page-title" style="margin:0 0 4px 0">群聊画像 / 日报</h2>
+<p class="page-desc" style="margin:0 0 16px 0">
+  任意日期范围的群聊日报（发言排行 · 沉默成员 · 关键词 · HTML 导出），或按年生成深度画像。
+  灵感来自 TraceMemo 日报，本版为本地确定性统计，不调用 AI。
+</p>
+
+<aside class="flow-callout" style="margin-bottom:16px">
+  <div class="flow-callout-title" style="color:var(--px-lime)">怎么用</div>
+  <p style="margin:0;line-height:1.7">
+    ① 选群 → ② 选「群聊日报」或「年度画像」→ ③ 生成。
+    日报可下载独立 HTML；沉默成员名单依赖通讯录解析，结论旁会标注限制说明。
+  </p>
+</aside>
 
 <div class="config-panel">
-  <div class="form-row">
-    <div style="flex:1"><label>年份</label><input id="cfg-year" type="number" value="2026" min="2011" max="2030"></div>
+  <div class="form-row" style="align-items:flex-end">
     <div style="flex:2"><label>搜索群聊</label><input id="cfg-q" placeholder="群名 / chatroom id" autocomplete="off"></div>
     <div><label>&nbsp;</label><button type="button" id="btn-refresh" class="btn btn-secondary">刷新列表</button></div>
   </div>
-</div>
-
-<div class="config-panel" style="margin-top:12px">
-  <label style="display:block;margin-bottom:8px">选择群聊</label>
-  <div id="group-picker" class="grp-picker">
+  <div id="group-picker" class="grp-picker" style="margin-top:10px">
     <div class="grp-picker-empty">加载中…</div>
   </div>
   <div id="sel-summary" class="grp-sel" style="display:none"></div>
-  <div style="margin-top:12px">
-    <button type="button" id="btn-load" class="btn btn-primary" disabled>生成群聊画像</button>
+</div>
+
+<div class="config-panel" style="margin-top:12px">
+  <div class="export-kind-tabs" style="margin-bottom:12px">
+    <button type="button" class="kind-btn active" data-mode="daily">群聊日报</button>
+    <button type="button" class="kind-btn" data-mode="annual">年度画像</button>
+  </div>
+
+  <div id="daily-opts">
+    <div class="form-row" style="flex-wrap:wrap">
+      <div style="flex:1.4;min-width:160px"><label>时间范围</label>
+        <select id="cfg-preset">
+          <option value="today">今日</option>
+          <option value="yesterday" selected>昨日</option>
+          <option value="7d">近 7 天</option>
+          <option value="30d">近 30 天</option>
+          <option value="custom">自定义</option>
+        </select>
+      </div>
+      <div id="custom-dates" class="form-row" style="display:none;flex:2;gap:8px">
+        <div style="flex:1"><label>起始</label><input type="date" id="cfg-start"></div>
+        <div style="flex:1"><label>截止</label><input type="date" id="cfg-end"></div>
+      </div>
+      <div><label>&nbsp;</label>
+        <button type="button" id="btn-load" class="btn btn-primary" disabled>生成日报</button>
+      </div>
+      <div><label>&nbsp;</label>
+        <button type="button" id="btn-html" class="btn btn-secondary" disabled>下载 HTML</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="annual-opts" style="display:none">
+    <div class="form-row">
+      <div style="flex:1"><label>年份</label><input id="cfg-year" type="number" value="2026" min="2011" max="2030"></div>
+      <div><label>&nbsp;</label>
+        <button type="button" id="btn-annual" class="btn btn-primary" disabled>生成年度画像</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -50,6 +93,12 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .grp-item .count { color: var(--px-muted); font-size: 12px; flex-shrink: 0; }
 .grp-sel { margin-top: 8px; font-size: 13px; color: var(--px-orange, #ff7a45); font-weight: 600; }
+.kind-btn {
+  padding: 6px 12px; border: 2px solid var(--px-border); background: var(--px-bg-2);
+  color: var(--px-text); cursor: pointer; font-family: var(--font-display); font-size: 12px;
+}
+.kind-btn.active { border-color: var(--px-orange); background: rgba(255,122,69,0.15); color: var(--px-orange); }
+.export-kind-tabs { display: flex; gap: 6px; }
 
 .wc { background: var(--px-panel, #143028); border: 1px solid var(--px-border, #2f6b54); border-radius: 0; padding: 24px; }
 .wc h3 { margin: 0 0 6px 0; color: var(--px-text, #e8f7ee); font-size: 18px; }
@@ -70,16 +119,27 @@
 .rank-track { flex: 1; height: 14px; background: rgba(0,0,0,0.08); border: 1px solid var(--px-border); }
 .rank-fill { height: 100%; background: var(--px-orange, #ff7a45); }
 .rank-val { width: 72px; text-align: right; color: var(--px-text); font-size: 12px; flex-shrink: 0; }
+.silent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.silent-item { background: rgba(0,0,0,0.06); border: 1px solid var(--px-border); padding: 8px 10px; font-size: 13px; }
+.hl-item { border-bottom: 1px solid var(--px-border); padding: 8px 0; }
+.hl-meta { font-size: 12px; color: var(--px-muted); }
+.lim-note { margin-top: 10px; font-size: 12px; color: var(--px-warn); line-height: 1.6; }
 </style>
 <script>
 (function () {
   let selected = null;
   let chatsCache = [];
   let loadTimer = null;
+  let mode = 'daily';
+  let lastReport = null;
   const picker = document.getElementById('group-picker');
   const summary = document.getElementById('sel-summary');
   const btnLoad = document.getElementById('btn-load');
+  const btnHtml = document.getElementById('btn-html');
+  const btnAnnual = document.getElementById('btn-annual');
   const qInput = document.getElementById('cfg-q');
+  const presetEl = document.getElementById('cfg-preset');
+  const customDates = document.getElementById('custom-dates');
 
   function esc(s) {
     const d = document.createElement('div');
@@ -88,6 +148,32 @@
   }
   function fmt(n) { return n != null ? Number(n).toLocaleString() : '—'; }
   function pct(v) { return v != null ? (v * 100).toFixed(1) + '%' : '—'; }
+
+  function setMode(next) {
+    mode = next;
+    document.querySelectorAll('.kind-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.mode === next);
+    });
+    document.getElementById('daily-opts').style.display = next === 'daily' ? 'block' : 'none';
+    document.getElementById('annual-opts').style.display = next === 'annual' ? 'block' : 'none';
+  }
+  document.querySelectorAll('.kind-btn').forEach(b => {
+    b.addEventListener('click', () => setMode(b.dataset.mode));
+  });
+
+  function syncCustom() {
+    const show = presetEl.value === 'custom';
+    customDates.style.display = show ? 'flex' : 'none';
+  }
+  presetEl.addEventListener('change', syncCustom);
+  syncCustom();
+
+  function updateButtons() {
+    const ok = !!selected;
+    btnLoad.disabled = !ok;
+    btnHtml.disabled = !ok;
+    btnAnnual.disabled = !ok;
+  }
 
   function renderPicker() {
     if (!chatsCache.length) {
@@ -110,8 +196,8 @@
         if (selected) {
           summary.style.display = 'block';
           summary.textContent = '已选：' + (selected.display_name || selected.username);
-          btnLoad.disabled = false;
         }
+        updateButtons();
       });
     });
   }
@@ -119,9 +205,11 @@
   const urlParams = new URLSearchParams(location.search);
   const preChat = (urlParams.get('chat') || '').trim();
   const preYear = urlParams.get('year');
+  const preMode = (urlParams.get('mode') || '').trim();
   if (preYear && /^\d{4}$/.test(preYear)) {
     document.getElementById('cfg-year').value = preYear;
   }
+  if (preMode === 'annual') setMode('annual');
 
   function loadGroups() {
     const q = qInput.value.trim();
@@ -145,15 +233,15 @@
         if (selected) {
           summary.style.display = 'block';
           summary.textContent = '已选：' + (selected.display_name || selected.username);
-          btnLoad.disabled = false;
         } else {
           summary.style.display = 'none';
-          btnLoad.disabled = true;
         }
+        updateButtons();
         renderPicker();
         if (preChat && selected && !window.__grpAutoloaded) {
           window.__grpAutoloaded = true;
-          btnLoad.click();
+          if (mode === 'annual') btnAnnual.click();
+          else btnLoad.click();
         }
       })
       .catch(err => {
@@ -277,8 +365,135 @@
       + esc(JSON.stringify(cardData, null, 2)) + '</pre>';
   }
 
+  function dailyBody() {
+    const body = {
+      chat: selected.username,
+      preset: presetEl.value,
+    };
+    if (body.preset === 'custom') {
+      body.start_date = document.getElementById('cfg-start').value;
+      body.end_date = document.getElementById('cfg-end').value;
+    }
+    return body;
+  }
+
+  function renderDaily(report) {
+    lastReport = report;
+    const ov = report.overview || {};
+    const speaking = report.speaking || {};
+    const container = document.getElementById('cards-container');
+    container.innerHTML = '';
+
+    const banner = document.createElement('div');
+    banner.className = 'wc';
+    banner.innerHTML = '<h3>' + esc(report.display_name || selected.display_name || '') + '</h3>'
+      + '<div class="wn">群聊日报 · ' + esc(report.range_label || '')
+      + '（' + esc(report.start_date) + ' ~ ' + esc(report.end_date) + '）</div>'
+      + renderStatPills([
+        {v: fmt(ov.total_messages), l: '总消息'},
+        {v: fmt(ov.unique_speakers), l: '发言人数'},
+        {v: fmt(ov.active_days), l: '活跃天数'},
+        {v: fmt(ov.messages_per_day), l: '日均'},
+        {v: fmt(ov.media_count), l: '图片/视频'},
+        {v: fmt(ov.voice_count), l: '语音'},
+        {v: ov.peak_hour != null ? ov.peak_hour + ':00' : '—', l: '最活跃时段'},
+        {v: ov.peak_weekday || '—', l: '最活跃星期'},
+      ]);
+    container.appendChild(banner);
+
+    const membersCard = document.createElement('div');
+    membersCard.className = 'wc';
+    membersCard.innerHTML = '<h3>发言排行</h3><div class="wn">按消息条数（系统消息已排除）</div>'
+      + renderRank((report.members || []).map(m => ({
+        name: m.name, count: m.count, share: m.share
+      })));
+    container.appendChild(membersCard);
+
+    const silent = speaking.silent_members || [];
+    const silentCard = document.createElement('div');
+    silentCard.className = 'wc';
+    let silentHtml = '<h3>沉默成员</h3>'
+      + '<div class="wn">名单内成员 − 本窗口发言者 · 共 ' + fmt(speaking.silent_count || silent.length) + ' 人'
+      + '（名单来源：' + esc(speaking.roster_source || '—') + '）</div>';
+    if (!silent.length) {
+      silentHtml += '<div class="wc-empty">窗口内成员均有发言，或成员名单不可用</div>';
+    } else {
+      silentHtml += '<div class="silent-grid">' + silent.slice(0, 80).map(function(s) {
+        return '<div class="silent-item">' + esc(s.display_name || s.wxid || '') + '</div>';
+      }).join('') + '</div>';
+    }
+    if (speaking.limitations && speaking.limitations.length) {
+      silentHtml += '<div class="lim-note">' + speaking.limitations.map(esc).join('<br>') + '</div>';
+    }
+    silentCard.innerHTML = silentHtml;
+    container.appendChild(silentCard);
+
+    if (report.heatmap && report.heatmap.matrix) {
+      const heat = document.createElement('div');
+      heat.className = 'wc';
+      heat.innerHTML = '<h3>活跃热力图</h3>'
+        + renderHeatmap(report.heatmap.weekday_labels, report.heatmap.hour_labels, report.heatmap.matrix);
+      container.appendChild(heat);
+    }
+
+    const kwCard = document.createElement('div');
+    kwCard.className = 'wc';
+    kwCard.innerHTML = '<h3>关键词</h3>' + (RENDERERS['text/keywords_wordcloud']({
+      keywords: report.keywords || [],
+      topKeyword: report.top_keyword,
+    }));
+    container.appendChild(kwCard);
+
+    const hl = report.highlights || [];
+    if (hl.length) {
+      const hlCard = document.createElement('div');
+      hlCard.className = 'wc';
+      hlCard.innerHTML = '<h3>文本摘录</h3>' + hl.map(function(h) {
+        return '<div class="hl-item"><div class="hl-meta">' + esc(h.time) + ' · ' + esc(h.sender)
+          + '</div><div>' + esc(h.text) + '</div></div>';
+      }).join('');
+      container.appendChild(hlCard);
+    }
+
+    document.getElementById('grp-content').style.display = 'block';
+  }
+
   btnLoad.addEventListener('click', () => {
     if (!selected) return;
+    setMode('daily');
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('grp-content').style.display = 'none';
+    fetch('/api/group/report', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(dailyBody()),
+    })
+      .then(r => r.json().then(data => ({ ok: r.ok, data })))
+      .then(({ ok, data }) => {
+        document.getElementById('loading').style.display = 'none';
+        if (!ok || data.error) {
+          alert('生成失败: ' + (data.error || '未知错误'));
+          return;
+        }
+        renderDaily(data);
+      })
+      .catch(err => {
+        document.getElementById('loading').style.display = 'none';
+        alert('生成失败: ' + err.message);
+      });
+  });
+
+  btnHtml.addEventListener('click', () => {
+    if (!selected) return;
+    const body = dailyBody();
+    const params = new URLSearchParams();
+    Object.keys(body).forEach(k => { if (body[k] != null && body[k] !== '') params.set(k, body[k]); });
+    window.location.href = '/api/group/report/html?' + params.toString();
+  });
+
+  btnAnnual.addEventListener('click', () => {
+    if (!selected) return;
+    setMode('annual');
     const year = document.getElementById('cfg-year').value;
     const params = new URLSearchParams({ year, chat: selected.username });
     document.getElementById('loading').style.display = 'block';

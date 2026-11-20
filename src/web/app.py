@@ -226,6 +226,12 @@ def create_app(decrypted_dir: str, wxid: str = None, db_dir: str = None) -> Flas
 
     _register_blueprint(app, 'routes.export_api', _register_export_bp)
 
+    def _register_group_report_bp():
+        from .routes.group_report_api import group_report_bp
+        app.register_blueprint(group_report_bp)
+
+    _register_blueprint(app, 'routes.group_report_api', _register_group_report_bp)
+
     # Moments / 朋友圈（离线只读）
     def _register_sns_bp():
         from .routes.sns_api import sns_bp

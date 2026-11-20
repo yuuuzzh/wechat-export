@@ -20,11 +20,109 @@ from engine.services.name_resolver import _find_contact_db
 
 api_bp = Blueprint('api', __name__)
 
+_SKILL_NAME = 'wechat-export-reader'
+_SKILL_VERSION = '1.0.0'
+
 
 def _cfg():
     return (current_app.config.get('DECRYPTED_DIR', ''),
             current_app.config.get('WXID'),
             current_app.config.get('DB_DIR'))
+
+
+def _skill_md_path() -> str | None:
+    """Locate docs/skill/wechat-export-reader/SKILL.md (dev / frozen)."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.normpath(os.path.join(here, '..', '..', '..', 'docs', 'skill',
+                                      _SKILL_NAME, 'SKILL.md')),
+        os.path.normpath(os.path.join(os.getcwd(), 'docs', 'skill',
+                                      _SKILL_NAME, 'SKILL.md')),
+    ]
+    meipass = getattr(sys, '_MEIPASS', None)
+    if meipass:
+        candidates.insert(0, os.path.join(meipass, 'docs', 'skill',
+                                          _SKILL_NAME, 'SKILL.md'))
+    for p in candidates:
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+@api_bp.route('/health')
+def health():
+    """GET /api/health — readiness for Agent / Reader Skill."""
+    from datetime import datetime
+    from engine.constants import TZ
+    from engine.version import VERSION
+    decrypted, wxid, _ = _cfg()
+    backup_ready = bool(decrypted and os.path.isdir(decrypted))
+    now = datetime.now(TZ)
+    return jsonify({
+        'ok': True,
+        'service': 'wechat-export',
+        'version': VERSION,
+        'backup_ready': backup_ready,
+        'decrypted_dir': decrypted if backup_ready else None,
+        'wxid': wxid or None,
+        'server_time': now.isoformat(timespec='seconds'),
+        'timezone': 'Asia/Shanghai',
+        'skill': {
+            'name': _SKILL_NAME,
+            'version': _SKILL_VERSION,
+            'url': f'/api/skill/{_SKILL_NAME}',
+        },
+        'readonly': True,
+    })
+
+
+@api_bp.route('/capabilities')
+def capabilities():
+    """GET /api/capabilities — high-level feature catalog for agents."""
+    return jsonify({
+        'ok': True,
+        'readonly': True,
+        'capabilities': [
+            {'id': 'contacts', 'path': '/api/contacts', 'methods': ['GET']},
+            {'id': 'messages', 'path': '/api/messages', 'methods': ['GET']},
+            {'id': 'search', 'path': '/api/search', 'methods': ['GET']},
+            {'id': 'group_info', 'path': '/api/chat/<chat_id>/group-info', 'methods': ['GET']},
+            {'id': 'group_report', 'path': '/api/group/report', 'methods': ['GET', 'POST'],
+             'notes': 'Deterministic daily/weekly group stats; no AI summary'},
+            {'id': 'group_member_stats', 'path': '/api/group/<chat_id>/member-stats',
+             'methods': ['GET']},
+            {'id': 'events', 'path': '/api/events/timeline', 'methods': ['GET', 'POST']},
+            {'id': 'graph', 'path': '/api/graph/relation', 'methods': ['GET', 'POST']},
+            {'id': 'export', 'path': '/api/export/run', 'methods': ['POST'],
+             'notes': 'SSE progress; writes export files locally'},
+            {'id': 'openapi', 'path': '/api/openapi.json', 'methods': ['GET']},
+        ],
+        'explicitly_unsupported': [
+            'send_wechat_message',
+            'hook_wechat_process',
+            'auto_reply',
+            'scheduled_send',
+        ],
+    })
+
+
+@api_bp.route(f'/skill/{_SKILL_NAME}')
+def skill_reader():
+    """GET /api/skill/wechat-export-reader — serve SKILL.md for Agent install."""
+    import hashlib
+    path = _skill_md_path()
+    if not path:
+        return jsonify({'ok': False, 'error': 'SKILL.md not found'}), 404
+    with open(path, encoding='utf-8') as f:
+        markdown = f.read()
+    digest = hashlib.sha256(markdown.encode('utf-8')).hexdigest()
+    return jsonify({
+        'ok': True,
+        'name': _SKILL_NAME,
+        'version': _SKILL_VERSION,
+        'contentHash': digest,
+        'markdown': markdown,
+    })
 
 
 # 深链定位参数：严格非负整数。`request.args.get(..., type=int)` **不能**用 ——

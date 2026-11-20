@@ -18,9 +18,11 @@
 | 关键词过滤 | 只匹配消息正文（空格 = AND，`\|` = OR）；ChatLab 格式同样支持 |
 | Excel 时间线 | 多会话按时间平铺，己方消息浅橙底 |
 | 会话报告包 | 对话 HTML + 词云 + 统计 JSON，打成 ZIP |
+| 群聊日报 | 今日 / 昨日 / 近 7·30 天统计 + 沉默成员 + 独立 HTML（本地确定性，无 AI） |
 | 全局搜索 | FTS 索引 + 正则 / 发送者 / 类型；命中可一键导出 Excel / HTML / CSV / TXT |
 | 语音导出 | 按人聚合、独立离线 HTML、合并音频 |
 | 综合 / 年度 / 词云 | 图表报告离线可用（不依赖 CDN）；年度报告可限定单个会话 |
+| Reader Skill | `/api/health` · `/api/capabilities` · `/api/skill/wechat-export-reader` 供 Agent 只读接入 |
 | Pull 数据源 | 供 ChatLab 远程增量拉取 |
 
 ### 为什么用 WeChat Export，而不是别的工具？
