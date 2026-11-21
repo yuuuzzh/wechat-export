@@ -1756,6 +1756,13 @@ body:has(#cleanup-app) #content { max-width: none; padding: 0; margin: 0; }
   border-color: var(--px-warn);
   background: color-mix(in srgb, var(--px-warn) 12%, var(--px-panel));
 }
+.flow-callout-mac {
+  border-color: var(--px-cyan, #e85d04);
+  background: color-mix(in srgb, var(--px-cyan, #e85d04) 10%, var(--px-panel));
+}
+.flow-callout-mac .flow-callout-title {
+  color: var(--px-cyan, #e85d04);
+}
 .flow-callout-title {
   font-family: var(--font-display);
   font-size: 15px;
@@ -1763,6 +1770,7 @@ body:has(#cleanup-app) #content { max-width: none; padding: 0; margin: 0; }
   margin: 0 0 8px 0;
 }
 .flow-callout a { color: var(--px-gold); }
+[data-mac-guide] { display: none; }
 
 .flow-section {
   margin: 0 0 22px 0;

@@ -24,6 +24,26 @@ WeChat Export 的查看 / 搜索 / 导出是纯 Python + Flask，本来就可移
 | 打包与工具 | `wechat_exp.exe`、`silk_decoder.exe`、计划任务 bat |
 | V2 密钥收割 | Windows 进程 API |
 
+## macOS 低风险用法（推荐）
+
+本工具在 Mac 上**不会**自动挂接微信进程取密钥（不做注入 / Frida / 关 SIP）。  
+这比「每次扫描进程」更不容易触发微信环境异常，但**不能保证永不风控**。
+
+推荐流程：
+
+1. **密钥只准备一次**：粘贴到「手动输入密钥」，或直接打开已解密备份。
+2. **日常只碰本地文件**：备份 / 导出 / 搜索；分析阶段可先退出微信。
+3. **读沙盒目录**：系统设置 → 隐私与安全性 → **完全磁盘访问权限**，允许 Terminal / Python / 本程序。
+4. **不要做**：关 SIP、chmod 整个微信目录、装发送/注入类插件、反复调试附着微信进程。
+
+路径示例：
+
+```text
+~/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/<账号>/db_storage
+```
+
+界面：仪表盘 / 备份页 / 手动密钥页会在检测到 macOS 时显示引导条（可点「知道了」收起）。
+
 ## 本仓库已做的 Phase 1
 
 - 平台能力探测：`engine/platform_info.py`，`GET /api/health` → `platform`
@@ -32,6 +52,7 @@ WeChat Export 的查看 / 搜索 / 导出是纯 Python + Flask，本来就可移
 - 非 Windows 跳过 V2 收割 / 自动 key_scan，并给出明确错误
 - `ffmpeg` / `silk_decoder` / 打开 tools 目录跨平台
 - 窄屏 CSS（聊天侧栏、仪表盘、表单）
+- macOS 低风险引导条（`static/js/mac_guide.js`）
 
 ## 后续 Phase（未做）
 

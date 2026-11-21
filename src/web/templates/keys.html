@@ -3,9 +3,11 @@
 {% block content %}
 <a href="/" class="back-link">← 返回仪表盘</a>
 <h2 style="margin:0 0 4px 0">🔑 手动输入密钥</h2>
-<p style="color:#8fb9a6;font-size:12px;margin:0 0 20px 0">
+<p style="color:#8fb9a6;font-size:12px;margin:0 0 16px 0">
   手上已经有密钥？直接粘贴进来。程序会逐个数据库做 HMAC 实测校验，配对成功后写入配置，
   此后「解密数据库」「一键备份」「聊天导出」「聊天查看器」等功能都能直接使用，无需再提取密钥。</p>
+
+<aside data-mac-guide="compact" style="margin-bottom:16px"></aside>
 
 <div class="config-panel">
   <div class="form-row">
