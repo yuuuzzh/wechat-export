@@ -1,7 +1,7 @@
 ﻿# WeChat Export · 微信导出
 
 > **维护者**：yuuu · **仓库**：https://github.com/yuuuzzh/wechat-export  
-> **版本**：2.13.20261102（正式版 `v0.3.0`）· **平台**：Windows 10/11 · **微信**：4.x（已测 4.1.9 / 4.1.10 / 4.1.12.55 / 4.1.15.11）  
+> **版本**：2.14.20261122（正式版 `v0.4.0`）· **平台**：Windows 10/11（完整）· macOS / Linux（分析导出）· **微信**：4.x（已测 4.1.9 / 4.1.10 / 4.1.12.55 / 4.1.15.11）  
 > **定位**：本地完成微信聊天记录的**分析、搜索与多格式导出**（备份是前置步骤）
 
 数据默认不出本机 · 可执行文件名 `wechat_exp.exe`（兼容分享包与旧脚本）。界面主题可切换（像素风 / 青春风 / 科技风 / 动漫风 / 微信原始风 / QQ 复古风等，持续完善）。
@@ -19,9 +19,11 @@
 | Excel 时间线 | 多会话按时间平铺，己方消息浅橙底 |
 | 会话报告包 | 对话 HTML + 词云 + 统计 JSON，打成 ZIP |
 | 群聊日报 | 今日 / 昨日 / 近 7·30 天统计 + 沉默成员 + 独立 HTML（本地确定性，无 AI） |
+| 笔记包 | Obsidian / Notion / Logseq：按日 MD + 附件；尽量解密 `.dat` 图片 |
 | 全局搜索 | FTS 索引 + 正则 / 发送者 / 类型；命中可一键导出 Excel / HTML / CSV / TXT |
 | 语音导出 | 按人聚合、独立离线 HTML、合并音频 |
-| 综合 / 年度 / 词云 | 图表报告离线可用（不依赖 CDN）；年度报告可限定单个会话 |
+| 综合 / 年度 / 词云 | 图表报告离线可用（不依赖 CDN）；可一键 PDF；年度报告可限定单个会话 |
+| 异步备份 | 后台跑完；离开页面后右上角可看进度并回页续看 |
 | Reader Skill | `/api/health` · `/api/capabilities` · `/api/skill/wechat-export-reader` 供 Agent 只读接入 |
 | Pull 数据源 | 供 ChatLab 远程增量拉取 |
 
@@ -476,30 +478,30 @@ python src/main.py voice-export --chat 家族群 --merge-by person --format mp3
 
 - **源码**：https://github.com/yuuuzzh/wechat-export  
 - **维护者**：yuuu  
-- **最新正式 Release**：https://github.com/yuuuzzh/wechat-export/releases/tag/v0.3.0  
-- **Windows 可执行文件**：https://github.com/yuuuzzh/wechat-export/releases/download/v0.3.0/WeChatExport-v0.3.0-windows-x64.exe  
+- **最新正式 Release**：https://github.com/yuuuzzh/wechat-export/releases/tag/v0.4.0  
+- **Windows 可执行文件**：https://github.com/yuuuzzh/wechat-export/releases/download/v0.4.0/WeChatExport-v0.4.0-windows-x64.exe  
 
-下载 exe 后双击即可；也可本地执行 `quick_build.bat` / `build.bat` 自行打包。分享包目录：`share_package/`（模板与说明）。
+下载 exe 后双击即可；也可本地执行 `quick_build.bat` / `build.bat` 自行打包。分享包目录：`share_package/`（模板与说明）。macOS / Linux 请用源码：`python src/main.py`（详见 `docs/platform.md`）。
 
-### 8.1 `v0.3.0`（2026-11-02）
+### 8.1 `v0.4.0`（2026-11-22）
 
-相对 `v0.2.0` 的主要变化：
+相对 `v0.3.0` 的主要变化：
 
 | 方向 | 内容 |
 |------|------|
-| 话题 / 事件时间线 | 按关键词聚类成事件卡片；可跳转搜索与聊天 |
-| 关系图谱 | 好友 / 群互动强度可视化（只读，ECharts） |
-| 跨年对比 | 今年 vs 去年同会话（或全部）：量级、类型、时段对照 |
-| 语音内容检索 | 转写灌入 FTS，可搜「说过什么」；命中标「语音·转写」 |
+| 笔记包 | Obsidian / Notion / Logseq：按日 Markdown + 附件；尽量解密 `.dat`；CLI 可导出 |
+| 异步备份 UX | 后台任务可离开页面；右上角进度条；首次使用引导更清晰 |
+| 群聊日报 | 今日 / 昨日 / 近 7·30 天统计 + 沉默成员 + 独立 HTML（本地确定性） |
+| Reader Skill | Agent 只读接入：`/api/health` · `/api/capabilities` · `/api/skill/...` |
+| macOS / Linux | 手动密钥 / 已解密备份 → 分析导出；窄屏适配；Mac 低风险引导条 |
+| 工作区与向导 | 多备份根切换；首次向导；报告一键 PDF；EML·mbox；导出插件脚本 |
 
-`v0.3.0` 之后主线已合入：**笔记包**（Obsidian / Notion / Logseq：按日笔记 + 附件目录）。
-
-上一正式版 `v0.2.0`（2026-10-22）已含：备份版本 / 媒体完整性、定时备份、隐私脱敏、收藏与文件传输、OpenAPI 等。
+上一正式版 `v0.3.0`（2026-11-02）已含：话题/事件时间线、关系图谱、跨年对比、语音转写进 FTS。
 
 > `build.bat` 可能改写 `wechat_exp.spec`，构建后请还原仓库中的手工维护版本。
 
-反馈时请附带：程序界面或控制台截图、微信版本、Windows 版本（`winver`）。
+反馈时请附带：程序界面或控制台截图、微信版本、操作系统版本。
 
 ---
 
-**最后更新**：2026-11-02 · WeChat Export by yuuu · 最新正式 tag `v0.3.0`
+**最后更新**：2026-11-22 · WeChat Export by yuuu · 最新正式 tag `v0.4.0`
