@@ -15,9 +15,6 @@
   }
 })();
 </script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Press+Start+2P&family=Rajdhani:wght@500;600;700&family=ZCOOL+KuaiLe&family=ZCOOL+QingKe+HuangYou&family=Zen+Maru+Gothic:wght@500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}">
 {% block head %}{% endblock %}
@@ -33,6 +30,12 @@
   <span class="nav-version" title="版本号">v{{ app_version }}</span>
   <div class="nav-right">
     <span id="workspace-switcher"></span>
+    <div class="nav-primary" aria-label="常用功能">
+      <a href="/chat" class="nav-link">聊天</a>
+      <a href="/search" class="nav-link">搜索</a>
+      <a href="/export" class="nav-link">导出</a>
+      <a href="/backup" class="nav-link">备份</a>
+    </div>
     <details class="theme-picker">
       <summary title="切换界面主题">主题</summary>
       <div class="theme-menu" role="listbox" aria-label="界面主题">

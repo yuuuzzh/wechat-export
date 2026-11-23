@@ -28,6 +28,7 @@
       <div class="chat-picker-empty">正在加载会话列表…</div>
     </div>
     <div id="sel-summary" class="sel-summary">已选 0 个会话</div>
+    <div id="export-inline-error" class="inline-error" role="alert" aria-live="polite" hidden></div>
   </div>
 
   <!-- 过滤与格式 -->
@@ -41,20 +42,25 @@
     <div style="flex:1.4;min-width:160px">
       <label>导出格式</label>
       <select id="cfg-format">
-        <option value="xlsx">Excel（按时间平铺）</option>
-        <option value="html" selected>HTML（对话气泡）</option>
-        <option value="txt">TXT 文本</option>
-        <option value="md">Markdown</option>
-        <option value="json">JSON（消息数组）</option>
-        <option value="csv">CSV 表格</option>
-        <option value="pgsql">PostgreSQL SQL</option>
-        <option value="eml">邮件归档 EML ZIP（法律/个人存档）</option>
-        <option value="mbox">邮件归档 mbox</option>
-        <option value="session-pack">会话报告包 ZIP（对话+词云+统计）</option>
-        <option value="notes-pack">笔记包 ZIP（Obsidian / Notion / Logseq · 按日+附件）</option>
-        <option value="chatlab-jsonl">ChatLab JSONL（可导入 · 断点续传）</option>
-        <option value="chatlab-json">ChatLab JSON</option>
+        <optgroup label="常用">
+          <option value="html" selected>HTML（对话气泡）</option>
+          <option value="xlsx">Excel（按时间平铺）</option>
+          <option value="txt">TXT 文本</option>
+          <option value="notes-pack">笔记包 ZIP</option>
+          <option value="csv">CSV 表格</option>
+        </optgroup>
+        <optgroup id="advanced-format-options" label="更多格式">
+          <option value="md">Markdown</option>
+          <option value="json">JSON（消息数组）</option>
+          <option value="pgsql">PostgreSQL SQL</option>
+          <option value="eml">邮件归档 EML ZIP</option>
+          <option value="mbox">邮件归档 mbox</option>
+          <option value="session-pack">会话报告包 ZIP</option>
+          <option value="chatlab-jsonl">ChatLab JSONL（可导入 · 断点续传）</option>
+          <option value="chatlab-json">ChatLab JSON</option>
+        </optgroup>
       </select>
+      <div id="format-hint" class="format-hint" aria-live="polite"></div>
     </div>
     <div><label>&nbsp;</label><button id="btn-run" class="btn btn-primary">开始导出</button></div>
   </div>
@@ -86,18 +92,22 @@
     </label>
   </div>
 
-  <p class="page-desc" style="margin:12px 0 0 0;line-height:1.7">
-    <b>关键词</b>：只匹配消息正文（不含发送者昵称）。空格=AND，<code>|</code>=OR。<br>
-    <b>Excel</b>：所有选中会话按时间线平铺，含「会话 / 发送者 / 类型 / 内容」列，己方消息浅橙底。<br>
-    <b>HTML</b>：对话气泡样式，导出文件内可再次页内搜索高亮。<br>
-    <b>会话报告包</b>：每个会话一份 ZIP（chat.html + wordcloud.html + stats.json）。<br>
-    <b>笔记包</b>：按日 Markdown + <code>attachments/</code>（图片 <code>.dat</code> 尽量解密）+ <code>manifest.json</code>，可导入 Obsidian / Logseq / Notion。<br>
-    <b>邮件归档</b>：EML ZIP / mbox，可用 Thunderbird、Outlook、Apple Mail 等法律/个人存档工具打开。<br>
-    <b>插件格式</b>：将 Python 脚本放入 <code>plugins/exporters/</code> 即可出现在下方格式列表（见示例 <code>example_jsonlines.py</code>）。<br>
-    <b>隐私脱敏</b>：仅作用于导出文件，备份库不变；适合公开分享演示。<br>
-    ChatLab 远程拉取请用 <a href="/pull">Pull 数据源</a>；
-    语音留言请用 <a href="/voice-export">语音导出</a>。
+  <p class="page-desc export-help-summary">
+    关键词只匹配消息正文：空格表示 AND，<code>|</code> 表示 OR。
   </p>
+  <details class="format-docs">
+    <summary>查看全部格式说明</summary>
+    <div class="page-desc">
+      <b>Excel / CSV</b>：选中会话按时间线平铺，便于筛选统计。<br>
+      <b>HTML</b>：对话气泡样式，可在导出文件中搜索高亮。<br>
+      <b>会话报告包</b>：每个会话一份 ZIP，包含对话、词云和统计。<br>
+      <b>笔记包</b>：按日 Markdown + 附件 + 清单，可导入 Obsidian / Logseq / Notion。<br>
+      <b>邮件归档</b>：EML ZIP / mbox，可用常见邮件客户端打开。<br>
+      <b>插件格式</b>：将 Python 脚本放入 <code>plugins/exporters/</code>（见 <code>example_jsonlines.py</code>）。<br>
+      <b>隐私脱敏</b>：仅修改导出文件，不影响备份库。<br>
+      ChatLab 远程拉取请用 <a href="/pull">Pull 数据源</a>；语音留言请用 <a href="/voice-export">语音导出</a>。
+    </div>
+  </details>
 </div>
 
 <div id="progress-container" class="progress-panel" style="display:none">
@@ -160,6 +170,16 @@
 .chat-item .badge.group { background: #ffe0ef; color: var(--px-pink); border-color: var(--px-pink); }
 .chat-item .count { color: var(--px-muted); font-size: 12px; flex-shrink: 0; min-width: 64px; text-align: right; }
 .sel-summary { color: var(--px-orange); font-size: 13px; margin-top: 8px; font-weight: 600; }
+.inline-error {
+  margin-top: 8px; padding: 8px 10px; color: var(--px-danger);
+  background: #fff0f1; border: 2px solid var(--px-danger); font-size: 13px;
+}
+.format-hint { min-height: 18px; margin-top: 5px; color: var(--px-muted); font-size: 12px; }
+.export-help-summary { margin: 12px 0 0; line-height: 1.7; }
+.format-docs { margin-top: 6px; font-size: 13px; }
+.format-docs summary { color: var(--px-orange); cursor: pointer; font-weight: 600; }
+.format-docs .page-desc { margin: 8px 0 0; line-height: 1.7; }
+.chat-picker-empty .btn { display: inline-block; margin-top: 12px; }
 .select-container {
   background: var(--px-panel); border: 3px solid var(--px-border); border-radius: 0;
   padding: 20px; margin-top: 16px; max-width: 600px; box-shadow: 4px 4px 0 var(--px-shadow);
@@ -179,6 +199,17 @@
   const picker = document.getElementById('chat-picker');
   const summary = document.getElementById('sel-summary');
   const qInput = document.getElementById('cfg-chat-q');
+  const inlineError = document.getElementById('export-inline-error');
+
+  function showInlineError(message) {
+    inlineError.textContent = message;
+    inlineError.hidden = false;
+  }
+
+  function clearInlineError() {
+    inlineError.textContent = '';
+    inlineError.hidden = true;
+  }
 
   function esc(s) {
     const d = document.createElement('div');
@@ -196,7 +227,8 @@
 
   function render() {
     if (!chatsCache.length) {
-      picker.innerHTML = '<div class="chat-picker-empty">暂无会话。请先完成「一键备份」。</div>';
+      picker.innerHTML = '<div class="chat-picker-empty">暂无会话。请先完成「一键备份」。<br>'
+        + '<a class="btn btn-primary" href="/backup">去一键备份</a></div>';
       return;
     }
     let html = '';
@@ -222,6 +254,7 @@
         if (cb.checked) selected.set(u, info || { username: u, display_name: u, is_group: false });
         else selected.delete(u);
         el.classList.toggle('selected', cb.checked);
+        if (selected.size) clearInlineError();
         updateSummary();
       };
       cb.addEventListener('change', sync);
@@ -265,6 +298,7 @@
   document.getElementById('btn-refresh-chats').addEventListener('click', loadChats);
   document.getElementById('btn-select-visible').addEventListener('click', () => {
     for (const c of chatsCache) selected.set(c.username, c);
+    if (selected.size) clearInlineError();
     render();
     updateSummary();
   });
@@ -285,7 +319,7 @@
     getBody: () => {
       const contacts = [...selected.keys()];
       if (!contacts.length) {
-        alert('请先在列表中勾选要导出的群聊/联系人');
+        showInlineError('请先在列表中勾选要导出的群聊或联系人');
         throw new Error('未选择会话');
       }
       return {
@@ -320,14 +354,45 @@
   fetch('/api/export/formats').then(r => r.json()).then(data => {
     if (!data || !data.ok) return;
     const sel = document.getElementById('cfg-format');
+    const advancedGroup = document.getElementById('advanced-format-options');
     (data.plugins || []).forEach(p => {
       if ([...sel.options].some(o => o.value === p.format)) return;
       const opt = document.createElement('option');
       opt.value = p.format;
       opt.textContent = '插件 · ' + (p.label || p.format);
-      sel.appendChild(opt);
+      advancedGroup.appendChild(opt);
     });
   }).catch(() => {});
+
+  const formatHints = {
+    html: '对话气泡，适合发给别人直接打开看',
+    xlsx: '按时间平铺表格，适合筛选统计',
+    txt: '纯文本，兼容性最好',
+    'notes-pack': '按日 Markdown，可导入 Obsidian 等',
+    csv: '通用表格，适合导入数据工具',
+    md: '单份 Markdown 文本',
+    json: '结构化消息数组，适合程序处理',
+    pgsql: '生成可导入 PostgreSQL 的 SQL',
+    eml: '邮件文件 ZIP，适合归档',
+    mbox: '标准邮箱归档文件',
+    'session-pack': '对话、词云与统计报告 ZIP',
+    'chatlab-jsonl': '可断点续传的 ChatLab 导入格式',
+    'chatlab-json': 'ChatLab JSON 导入格式',
+  };
+  const formatSelect = document.getElementById('cfg-format');
+  const formatHint = document.getElementById('format-hint');
+  const updateFormatHint = () => {
+    formatHint.textContent = formatHints[formatSelect.value] || '插件提供的扩展导出格式';
+  };
+  formatSelect.addEventListener('change', updateFormatHint);
+  // Apply default format from Settings (localStorage), if present in the select.
+  try {
+    const preferred = localStorage.getItem('wechat-export-default-export-format');
+    if (preferred && [...formatSelect.options].some((o) => o.value === preferred)) {
+      formatSelect.value = preferred;
+    }
+  } catch (e) { /* ignore */ }
+  updateFormatHint();
 
   // WizardPage.start 在 getBody 抛错时仍会 disable 按钮——拦截一下
   const runBtn = document.getElementById('btn-run');
@@ -335,7 +400,7 @@
   runBtn.addEventListener('click', (e) => {
     if (!selected.size) {
       e.stopImmediatePropagation();
-      alert('请先在列表中勾选要导出的群聊/联系人');
+      showInlineError('请先在列表中勾选要导出的群聊或联系人');
       runBtn.disabled = false;
     }
   }, true);

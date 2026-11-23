@@ -13,8 +13,8 @@ html[data-theme="pixel"] {
   --nav-border-w: 4px;
   --elev: 4px 4px 0 var(--px-shadow);
   --elev-sm: 2px 2px 0 var(--px-shadow);
-  --font-brand: "Press Start 2P", "ZCOOL QingKe HuangYou", monospace;
-  --font-display: "ZCOOL QingKe HuangYou", "Noto Sans SC", sans-serif;
+  --font-brand: "Press Start 2P", ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  --font-display: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   --brand-anim: brand-pulse 2.4s steps(2) infinite;
   --motion-ease: steps(2);
 }
@@ -60,9 +60,9 @@ html[data-theme="youth"] {
   --bubble-me-hover: #99f6e4;
   --bubble-other-bg: #ffffff;
   --contact-active-bg: #d1fae5;
-  --font-brand: "ZCOOL QingKe HuangYou", "Noto Sans SC", sans-serif;
-  --font-display: "ZCOOL QingKe HuangYou", "Noto Sans SC", sans-serif;
-  --font-body: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-brand: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-display: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   --radius: 10px;
   --radius-sm: 8px;
   --radius-avatar: 12px;
@@ -123,9 +123,9 @@ html[data-theme="tech"] {
   --bubble-me-hover: #16405c;
   --bubble-other-bg: #152033;
   --contact-active-bg: #16324a;
-  --font-brand: "Orbitron", "Noto Sans SC", sans-serif;
-  --font-display: "Rajdhani", "Noto Sans SC", sans-serif;
-  --font-body: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-brand: "Orbitron", system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-display: "Rajdhani", system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   --radius: 6px;
   --radius-sm: 4px;
   --radius-avatar: 6px;
@@ -197,9 +197,9 @@ html[data-theme="anime"] {
   --bubble-me-hover: #eadcff;
   --bubble-other-bg: #ffffff;
   --contact-active-bg: #ffe4f1;
-  --font-brand: "Zen Maru Gothic", "ZCOOL QingKe HuangYou", "Noto Sans SC", sans-serif;
-  --font-display: "Zen Maru Gothic", "Noto Sans SC", sans-serif;
-  --font-body: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-brand: "Zen Maru Gothic", system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-display: "Zen Maru Gothic", system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   --radius: 16px;
   --radius-sm: 12px;
   --radius-avatar: 50%;
@@ -261,9 +261,9 @@ html[data-theme="wechat"] {
   --bubble-me-hover: #89d961;
   --bubble-other-bg: #ffffff;
   --contact-active-bg: #e9f8ef;
-  --font-brand: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-display: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-brand: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-display: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   --radius: 8px;
   --radius-sm: 6px;
   --radius-avatar: 6px;
@@ -333,9 +333,9 @@ html[data-theme="qq"] {
   --bubble-me-hover: #b7dcff;
   --bubble-other-bg: #ffffff;
   --contact-active-bg: #d7ecff;
-  --font-brand: "ZCOOL KuaiLe", "ZCOOL QingKe HuangYou", "Noto Sans SC", sans-serif;
-  --font-display: "ZCOOL KuaiLe", "Noto Sans SC", sans-serif;
-  --font-body: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-brand: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-display: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   --radius: 4px;
   --radius-sm: 3px;
   --radius-avatar: 4px;

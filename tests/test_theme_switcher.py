@@ -33,6 +33,15 @@ def test_base_has_theme_picker_and_early_script():
     assert 'WeChat Export' in html
     for tid in EXPECTED:
         assert f'data-theme-set="{tid}"' in html
+    for href, label in (
+        ('/chat', '聊天'),
+        ('/search', '搜索'),
+        ('/export', '导出'),
+        ('/backup', '备份'),
+    ):
+        assert f'href="{href}" class="nav-link">{label}</a>' in html
+    assert 'fonts.googleapis.com' not in html
+    assert 'fonts.gstatic.com' not in html
 
 
 def test_themes_css_defines_all_packs():

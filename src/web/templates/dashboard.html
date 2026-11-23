@@ -4,11 +4,19 @@
 <section class="dashboard-hero">
   <h1>WeChat Export</h1>
   <p>微信聊天记录的本地分析与导出：多选会话、关键词检索、Excel/HTML/报告一站完成。数据不出本机 · 维护者 yuuu。</p>
-  <p style="margin-top:12px"><a class="btn btn-primary" href="/setup">首次向导</a>
+  <p id="dashboard-default-actions" style="margin-top:12px"><a id="dashboard-main-action" class="btn btn-primary" href="/setup">首次向导</a>
     <a class="btn" href="/versions" style="margin-left:8px">备份版本 / 工作区</a></p>
 </section>
 
-<aside class="flow-callout flow-callout-warn" style="margin-bottom:16px">
+<section id="dashboard-onboarding" class="onboard-hero config-panel" hidden aria-live="polite">
+  <div class="onboard-kicker">开始使用</div>
+  <h2 id="dashboard-next-title">准备你的第一份本地备份</h2>
+  <p id="dashboard-next-desc">跟随向导检测微信目录、提取密钥并生成可浏览的本地备份。</p>
+  <a id="dashboard-next-action" class="btn btn-primary onboard-primary-action" href="/setup">开始首次向导</a>
+  <p class="onboard-note">说明：这里的本地备份不是微信官方「备份与恢复」，所有处理均在本机完成。</p>
+</section>
+
+<aside id="dashboard-first-run-warning" class="flow-callout flow-callout-warn" style="margin-bottom:16px">
   <div class="flow-callout-title">首次使用请先做「一键备份」</div>
   <p style="margin:0;line-height:1.7">
     必须先在本平台完成 <a href="/backup">一键备份</a>（解密 + 索引），后续导出 / 搜索 / 报告才有数据可读。
@@ -18,6 +26,9 @@
 
 <aside data-mac-guide style="margin-bottom:28px"></aside>
 
+<details id="dashboard-all-features" class="onboard-feature-details" open>
+  <summary>查看全部功能</summary>
+  <div class="onboard-feature-content">
 <div class="dashboard-section">
   <h2>① 数据采集（先做这里）</h2>
   <p class="section-subtitle">首次必经：平台内一键备份 → 再浏览 / 分析 / 导出</p>
@@ -187,4 +198,95 @@
     </a>
   </div>
 </div>
+  </div>
+</details>
+{% endblock %}
+{% block scripts %}
+<script>
+(async function () {
+  const onboarding = document.getElementById('dashboard-onboarding');
+  const warning = document.getElementById('dashboard-first-run-warning');
+  const details = document.getElementById('dashboard-all-features');
+  const defaultActions = document.getElementById('dashboard-default-actions');
+  const mainAction = document.getElementById('dashboard-main-action');
+  const title = document.getElementById('dashboard-next-title');
+  const desc = document.getElementById('dashboard-next-desc');
+  const action = document.getElementById('dashboard-next-action');
+  const nextSteps = {
+    detect: {
+      title: '先检测微信数据目录',
+      desc: '找到本机微信数据后，才能继续提取密钥和生成备份。',
+      label: '检测微信目录',
+      href: '/backup'
+    },
+    keys: {
+      title: '下一步：提取解密密钥',
+      desc: '请保持微信已登录并运行，然后提取本机数据库密钥。',
+      label: '去提取密钥',
+      href: '/keyscan'
+    },
+    backup: {
+      title: '下一步：生成本地备份',
+      desc: '目录和密钥已经准备好，现在生成可浏览、可导出的本地备份。',
+      label: '开始一键备份',
+      href: '/backup'
+    },
+    viewer: {
+      title: '准备完成',
+      desc: '打开聊天查看器，开始浏览你的本地聊天记录。',
+      label: '打开聊天查看器',
+      href: '/chat'
+    }
+  };
+
+  try {
+    const response = await fetch('/api/setup/status');
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error('setup status unavailable');
+
+    if (data.complete) {
+      warning.hidden = true;
+      mainAction.textContent = '打开聊天查看器';
+      mainAction.href = '/chat';
+      details.open = true;
+      details.classList.add('dash-ready-features');
+      const summary = details.querySelector('summary');
+      if (summary) summary.textContent = '全部功能';
+      // Prefer browse/analyze before data-collection for returning users.
+      const content = details.querySelector('.onboard-feature-content');
+      if (content) {
+        const sections = Array.from(content.querySelectorAll(':scope > .dashboard-section'));
+        const orderHint = ['② 浏览', '③ 分析与导出', '更多导出', '① 数据采集', '工具'];
+        sections.sort((a, b) => {
+          const ha = (a.querySelector('h2') || {}).textContent || '';
+          const hb = (b.querySelector('h2') || {}).textContent || '';
+          const ia = orderHint.findIndex((t) => ha.indexOf(t) === 0 || ha === t);
+          const ib = orderHint.findIndex((t) => hb.indexOf(t) === 0 || hb === t);
+          return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+        });
+        sections.forEach((sec) => content.appendChild(sec));
+      }
+      return;
+    }
+
+    const next = nextSteps[data.next_step] || {
+      title: '完成首次设置',
+      desc: '跟随向导准备一份可浏览、可导出的本地备份。',
+      label: '继续首次向导',
+      href: '/setup'
+    };
+    title.textContent = next.title;
+    desc.textContent = next.desc;
+    action.textContent = next.label;
+    action.href = next.href;
+    onboarding.hidden = false;
+    defaultActions.hidden = true;
+    warning.hidden = true;
+    details.open = false;
+    details.classList.add('onboard-feature-details-active');
+  } catch (error) {
+    // Progressive enhancement: keep the original dashboard and manual links.
+  }
+})();
+</script>
 {% endblock %}

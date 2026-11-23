@@ -77,6 +77,16 @@ def test_settings_page_renders(html):
     assert '设置' in html
 
 
+def test_settings_prefs_panel_present(html):
+    """界面偏好：主题 / 默认导出格式 / 日常备份范围。"""
+    assert 'id="prefs-panel"' in html
+    assert 'id="cfg-ui-theme"' in html
+    assert 'id="cfg-default-export-format"' in html
+    assert 'id="cfg-backup-days-pref"' in html
+    assert 'wechat-export-default-export-format' in html
+    assert 'wechat-export-backup-days-pref' in html
+
+
 @pytest.mark.parametrize('cid', PICKER_IDS)
 def test_picker_controls_present(html, cid):
     assert 'id="%s"' % cid in html, '设置页缺少选择器控件 #%s' % cid

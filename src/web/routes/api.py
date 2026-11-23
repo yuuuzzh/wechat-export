@@ -108,6 +108,76 @@ def capabilities():
     })
 
 
+def _util_data_roots() -> list[str]:
+    """Candidate roots that /api/util/open-path may reveal."""
+    roots: list[str] = []
+    decrypted, _, db_dir = _cfg()
+    for p in (decrypted, db_dir, current_app.config.get('PROJECT_ROOT')):
+        if p:
+            roots.append(os.path.abspath(p))
+    # exe / frozen exe directory (same idea as web.app._project_root)
+    if getattr(sys, 'frozen', False):
+        roots.append(os.path.dirname(os.path.abspath(sys.executable)))
+    else:
+        # src/web/routes/api.py → parents: routes, web, src, repo
+        here = os.path.dirname(os.path.abspath(__file__))
+        repo = os.path.dirname(os.path.dirname(os.path.dirname(here)))
+        roots.append(repo)
+    extra = []
+    for root in list(roots):
+        for name in ('backup', 'export', 'exports', 'output', 'dist', 'schedule'):
+            extra.append(os.path.join(root, name))
+    roots.extend(extra)
+    # Dedupe while preserving order
+    seen = set()
+    out = []
+    for r in roots:
+        if r and r not in seen:
+            seen.add(r)
+            out.append(r)
+    return out
+
+
+def _open_path_allowed(target: str) -> bool:
+    """Only allow revealing paths under known local data/export roots."""
+    abs_target = os.path.abspath(target)
+    if not os.path.exists(abs_target):
+        return False
+    for base in _util_data_roots():
+        try:
+            if os.path.commonpath([abs_target, base]) == base:
+                return True
+        except ValueError:
+            continue
+    return False
+
+
+@api_bp.route('/util/open-path', methods=['POST'])
+def util_open_path():
+    """POST /api/util/open-path — open a local file/folder in the OS file manager.
+
+    Body: ``{"path": "..."}``. Path must exist and sit under backup/export/project roots.
+    """
+    from engine.platform_info import open_path
+    data = request.get_json(silent=True) or {}
+    path = (data.get('path') or '').strip()
+    if not path:
+        return jsonify({'ok': False, 'error': 'missing_path', 'message': '缺少 path'}), 400
+    abs_path = os.path.abspath(path)
+    if not os.path.exists(abs_path):
+        return jsonify({'ok': False, 'error': 'not_found', 'message': '路径不存在'}), 404
+    if not _open_path_allowed(abs_path):
+        return jsonify({
+            'ok': False,
+            'error': 'forbidden',
+            'message': '只能打开本程序备份/导出目录下的路径',
+        }), 403
+    # Prefer opening the containing folder for files
+    reveal = abs_path if os.path.isdir(abs_path) else os.path.dirname(abs_path)
+    opened = open_path(reveal)
+    return jsonify({'ok': True, 'opened': bool(opened), 'path': reveal})
+
+
 @api_bp.route(f'/skill/{_SKILL_NAME}')
 def skill_reader():
     """GET /api/skill/wechat-export-reader — serve SKILL.md for Agent install."""

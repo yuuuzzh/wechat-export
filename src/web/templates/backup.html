@@ -72,6 +72,9 @@
           <option value="365">最近 1 年</option>
           <option value="0">全部记录</option>
         </select>
+        <div id="backup-range-hint" style="display:none;color:var(--px-muted);font-size:12px;margin-top:6px;line-height:1.6">
+          首次建议备份全部；数据量大时可能较慢
+        </div>
       </div>
     </div>
     <label class="check-row" style="margin-top:10px">
@@ -136,6 +139,33 @@
       try { localStorage.setItem(TIP_KEY, '1'); } catch (e) { /* ignore */ }
       if (tip) tip.style.display = 'none';
     });
+  }
+})();
+
+// Keep the HTML fallback at 30 days; switch only after confirming this is the first backup.
+(async function setInitialBackupRange() {
+  const daysSelect = document.getElementById('cfg-days');
+  const rangeHint = document.getElementById('backup-range-hint');
+  if (!daysSelect || !rangeHint) return;
+  // Settings page preference for returning users (localStorage).
+  let preferredDays = '30';
+  try {
+    const stored = localStorage.getItem('wechat-export-backup-days-pref');
+    if (stored && /^(0|7|30|90|365)$/.test(stored)) preferredDays = stored;
+  } catch (e) { /* ignore */ }
+  try {
+    const response = await fetch('/api/workspace');
+    if (!response.ok) return;
+    const status = await response.json();
+    const hasVersions = (status.accounts || []).some(
+      account => account.versions && account.versions.length > 0
+    );
+    const hasBackup = !!(status.ready && status.ready.has_backup) || hasVersions;
+    // First backup → all history; later → settings preference (default 30 days).
+    daysSelect.value = hasBackup ? preferredDays : '0';
+    rangeHint.style.display = hasBackup ? 'none' : 'block';
+  } catch (e) {
+    // Preserve the progressive-enhancement default when status is unavailable.
   }
 })();
 
@@ -241,10 +271,42 @@ page.showResult = function(result) {
   if (!hasErrors) {
     html += '<p style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">';
     html += '<a href="/chat" class="btn btn-primary" style="display:inline-block;text-decoration:none">打开聊天查看器</a>';
+    html += '<a href="/export" class="btn btn-secondary" style="display:inline-block;text-decoration:none">去导出</a>';
     html += '<a href="/versions" class="btn btn-secondary" style="display:inline-block;text-decoration:none">备份版本 / 对比回滚</a>';
+    const openPath = stats.output_dir || stats.link_dest || (stats.version && stats.version.path) || '';
+    if (openPath) {
+      html += '<button type="button" class="btn btn-secondary" id="btn-open-backup-dir" data-path="'
+        + String(openPath).replace(/"/g, '&quot;') + '">在文件夹中显示</button>';
+    }
     html += '</p>';
+  } else {
+    const errorText = stats.errors.join(' ');
+    if (/密钥|提钥|key|decrypt|sqlcipher/i.test(errorText)) {
+      html += '<p style="margin-top:12px"><a href="/keyscan" class="btn btn-secondary" style="display:inline-block;text-decoration:none">重新提取密钥</a></p>';
+    }
   }
   document.getElementById('result-content').innerHTML = html;
+  const openBtn = document.getElementById('btn-open-backup-dir');
+  if (openBtn) {
+    openBtn.addEventListener('click', () => {
+      const path = openBtn.getAttribute('data-path') || '';
+      if (!path) return;
+      openBtn.disabled = true;
+      fetch('/api/util/open-path', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: path }),
+      }).then((r) => r.json()).then((data) => {
+        if (!data || !data.ok) {
+          const hint = document.getElementById('dir-hint');
+          if (hint) hint.textContent = '无法打开文件夹：' + ((data && data.message) || '未知错误');
+        }
+      }).catch((e) => {
+        const hint = document.getElementById('dir-hint');
+        if (hint) hint.textContent = '无法打开文件夹：' + e;
+      }).finally(() => { openBtn.disabled = false; });
+    });
+  }
 };
 
 // Override handleSelect for account selection (not chat selection)
@@ -325,7 +387,14 @@ document.getElementById('btn-detect').addEventListener('click', () => {
         }
       }
     },
-    onError: (err) => alert('检测失败: ' + err.message),
+    onError: (err) => {
+      const hint = document.getElementById('dir-hint');
+      if (hint) {
+        hint.textContent = '检测失败：' + (err.message || '未知错误') + '。可重试深度搜索，或手动粘贴微信数据目录。';
+        hint.style.color = '#ff5a6e';
+        hint.setAttribute('role', 'alert');
+      }
+    },
   });
   sse.start();
 });

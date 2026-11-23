@@ -177,7 +177,7 @@
 
   function renderPicker() {
     if (!chatsCache.length) {
-      picker.innerHTML = '<div class="grp-picker-empty">暂无群聊。请先完成「一键备份」。</div>';
+      picker.innerHTML = '<div class="grp-picker-empty">暂无群聊。请先完成「一键备份」。<div style="margin-top:12px"><a class="btn btn-primary" href="/backup" style="text-decoration:none">去一键备份</a></div></div>';
       return;
     }
     let html = '';

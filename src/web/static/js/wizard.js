@@ -219,35 +219,116 @@ class WizardPage {
 
     if (!result) return;
 
-    const linkStyle = 'color:#58a6ff;font-size:15px;text-decoration:none;' +
-      'padding:10px 20px;background:#1a1a2e;border:1px solid #30363d;' +
-      'border-radius:8px;display:inline-block;margin-top:4px;cursor:pointer';
+    const appendSummary = (text) => {
+      const summary = document.createElement('p');
+      summary.style.cssText = 'color:var(--px-muted);margin:0 0 8px 0';
+      summary.textContent = text;
+      container.appendChild(summary);
+    };
+    const appendPath = (path, manualHint) => {
+      const pathLabel = document.createElement('p');
+      pathLabel.style.cssText = 'color:var(--px-muted);margin:10px 0 0 0;line-height:1.7';
+      pathLabel.appendChild(document.createTextNode('文件路径：'));
+      const code = document.createElement('code');
+      code.style.cssText = 'font-family:monospace;word-break:break-all';
+      code.textContent = path;
+      pathLabel.appendChild(code);
+      container.appendChild(pathLabel);
+      if (manualHint) {
+        const hint = document.createElement('p');
+        hint.style.cssText = 'color:var(--px-muted);font-size:12px;margin:4px 0 0 0';
+        hint.textContent = '请复制以上路径，在文件管理器中手动打开所在文件夹。';
+        container.appendChild(hint);
+      }
+    };
+    const createActions = () => {
+      const actions = document.createElement('div');
+      actions.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;margin-top:12px';
+      container.appendChild(actions);
+      return actions;
+    };
 
     if (result.view_url) {
-      container.innerHTML = '<p style="color:#8b949e;margin:0 0 8px 0">共分析 ' +
-        (result.msg_count || 0).toLocaleString() + ' 条消息</p>';
+      appendSummary('共分析 ' + (result.msg_count || 0).toLocaleString() + ' 条消息');
+      const actions = createActions();
       const link = document.createElement('a');
       link.href = result.view_url;
       link.target = '_blank';
       link.textContent = '📊 在新标签页打开词云报告';
-      link.style.cssText = linkStyle;
-      container.appendChild(link);
+      link.className = 'btn btn-primary';
+      link.style.textDecoration = 'none';
+      actions.appendChild(link);
     } else if (result.download_url) {
-      container.innerHTML = '<p style="color:#8b949e;margin:0 0 8px 0">共导出 ' +
-        (result.msg_count || 0).toLocaleString() + ' 条消息</p>';
+      appendSummary('共导出 ' + (result.msg_count || 0).toLocaleString() + ' 条消息');
+      const actions = createActions();
       const link = document.createElement('a');
       link.href = result.download_url;
       link.textContent = '📥 下载导出文件 (' + (result.filename || '') + ')';
-      link.style.cssText = linkStyle;
-      container.appendChild(link);
+      link.className = 'btn btn-primary';
+      link.style.textDecoration = 'none';
+      actions.appendChild(link);
+
+      const againButton = document.createElement('button');
+      againButton.type = 'button';
+      againButton.className = 'btn btn-secondary';
+      againButton.textContent = '再导一份';
+      againButton.addEventListener('click', () => {
+        if (!this.runBtn) return;
+        this.runBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        this.runBtn.focus({ preventScroll: true });
+      });
+      actions.appendChild(againButton);
+
+      const isPathLike = typeof result.file === 'string' && (
+        /[\\/]/.test(result.file) || /^[A-Za-z]:/.test(result.file)
+      );
+      if (isPathLike) {
+        appendPath(result.file, false);
+        const openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.className = 'btn btn-secondary';
+        openBtn.textContent = '在文件夹中显示';
+        openBtn.addEventListener('click', () => {
+          openBtn.disabled = true;
+          fetch('/api/util/open-path', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: result.file }),
+          }).then((r) => r.json()).then((data) => {
+            if (!data || !data.ok) {
+              appendPath(result.file, true);
+            }
+          }).catch(() => {
+            appendPath(result.file, true);
+          }).finally(() => { openBtn.disabled = false; });
+        });
+        actions.appendChild(openBtn);
+      }
     } else if (result.file) {
-      container.innerHTML = '<p style="color:#8b949e;margin:0 0 8px 0">文件路径: ' +
-        this.escapeHtml(result.file) + '</p>';
+      appendPath(result.file, true);
+      const actions = createActions();
+      const openBtn = document.createElement('button');
+      openBtn.type = 'button';
+      openBtn.className = 'btn btn-secondary';
+      openBtn.textContent = '在文件夹中显示';
+      openBtn.addEventListener('click', () => {
+        openBtn.disabled = true;
+        fetch('/api/util/open-path', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: result.file }),
+        }).then((r) => r.json()).then((data) => {
+          if (!data || !data.ok) {
+            /* path already shown with manual hint */
+          }
+        }).finally(() => { openBtn.disabled = false; });
+      });
+      actions.appendChild(openBtn);
     }
 
     if (result.note) {
       const note = document.createElement('p');
-      note.style.cssText = 'color:#8b949e;font-size:12px;margin:10px 0 0 0;' +
+      note.style.cssText = 'color:var(--px-muted);font-size:12px;margin:10px 0 0 0;' +
         'max-width:640px;line-height:1.7';
       note.textContent = result.note;
       container.appendChild(note);

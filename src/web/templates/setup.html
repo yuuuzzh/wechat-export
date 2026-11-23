@@ -3,61 +3,141 @@
 {% block content %}
 <a href="/" class="back-link">← 返回仪表盘</a>
 <h2 class="page-title">首次使用向导</h2>
-<p class="page-desc">按顺序完成：检测微信 → 提钥 → 备份 → 打开查看器。已完成的步骤可跳过。</p>
+<p class="page-desc">按顺序完成四步，准备一份可浏览、可导出的本地聊天备份。</p>
 
-<div id="setup-status" class="config-panel" style="margin-bottom:16px">
-  <div id="setup-summary" style="color:var(--px-muted);font-size:13px">正在检查环境…</div>
+<div id="setup-status" class="config-panel onboard-status-panel" style="margin-bottom:16px" aria-live="polite">
+  <div>
+    <div class="onboard-kicker">微信运行状态</div>
+    <div id="setup-wechat-status" class="onboard-wechat-status">正在检测微信…</div>
+    <div id="setup-summary" style="color:var(--px-muted);font-size:13px;margin-top:6px">正在检查环境…</div>
+  </div>
+  <button type="button" class="btn" id="setup-refresh">重新检测</button>
 </div>
 
 <ol id="setup-steps" style="list-style:none;padding:0;margin:0 0 24px 0;display:flex;flex-direction:column;gap:12px"></ol>
 
-<div class="form-row" style="gap:12px;flex-wrap:wrap">
+<div id="setup-success" class="flow-callout onboard-success" hidden>
+  <div class="flow-callout-title">准备完成，可以开始使用了</div>
+  <p>本地备份已就绪，现在可以浏览聊天记录或按需导出。</p>
+  <div class="form-row onboard-success-actions">
+    <a class="btn btn-primary" href="/chat">打开聊天查看器</a>
+    <a class="btn" href="/export">去导出</a>
+  </div>
+</div>
+
+<div id="setup-manual-links" class="form-row onboard-manual-links" style="gap:12px;flex-wrap:wrap">
   <a class="btn" href="/backup">打开备份页</a>
   <a class="btn" href="/keyscan">打开提钥页</a>
-  <a class="btn btn-primary" id="btn-open-viewer" href="/chat" style="display:none">打开聊天查看器</a>
-  <a class="btn" href="/export" id="btn-open-export" style="display:none">去导出</a>
+</div>
+
+<div id="setup-next-bar" class="onboard-next-bar" hidden>
+  <span id="setup-next-hint">继续完成下一步</span>
+  <a id="setup-next-action" class="btn btn-primary" href="/setup">一键去完成下一步</a>
 </div>
 {% endblock %}
 {% block scripts %}
 <script>
-(async function () {
+(function () {
   const stepsEl = document.getElementById('setup-steps');
   const summary = document.getElementById('setup-summary');
-  const mapLink = {
-    detect: '/backup',
-    keys: '/keyscan',
-    backup: '/backup',
-    viewer: '/chat',
+  const wechatStatus = document.getElementById('setup-wechat-status');
+  const refreshButton = document.getElementById('setup-refresh');
+  const success = document.getElementById('setup-success');
+  const manualLinks = document.getElementById('setup-manual-links');
+  const nextBar = document.getElementById('setup-next-bar');
+  const nextHint = document.getElementById('setup-next-hint');
+  const nextAction = document.getElementById('setup-next-action');
+  const actions = {
+    detect: { href: '/backup', label: '检测目录' },
+    keys: { href: '/keyscan', label: '提取密钥' },
+    backup: { href: '/backup', label: '开始备份' },
+    viewer: { href: '/chat', label: '打开查看器' }
   };
-  try {
-    const r = await fetch('/api/setup/status');
-    const data = await r.json();
-    if (!data.ok) throw new Error('status failed');
-    const running = data.wechat_running ? '微信进程：运行中' : '微信进程：未检测到（提钥时请先登录微信）';
-    summary.textContent = (data.complete ? '环境已就绪，可直接使用。' : '请按未完成步骤继续。') + ' · ' + running;
-    stepsEl.innerHTML = '';
-    (data.steps || []).forEach((s, i) => {
+
+  function renderStep(step, index, nextStep) {
+    const li = document.createElement('li');
+    li.className = 'config-panel onboard-step';
+    if (step.done) li.classList.add('onboard-step-done');
+    if (!step.done && step.id === nextStep) li.classList.add('onboard-step-current');
+
+    const body = document.createElement('div');
+    const heading = document.createElement('strong');
+    heading.textContent = (index + 1) + '. ' + step.title;
+    const hint = document.createElement('div');
+    hint.className = 'onboard-step-hint';
+    hint.textContent = step.hint || '';
+    body.appendChild(heading);
+    body.appendChild(hint);
+
+    const state = document.createElement(step.done ? 'span' : 'a');
+    if (step.done) {
+      state.className = 'onboard-step-complete';
+      state.textContent = '已完成';
+    } else {
+      const action = actions[step.id] || { href: '/setup', label: '去完成' };
+      state.className = 'btn btn-primary';
+      state.href = action.href;
+      state.textContent = action.label;
+    }
+
+    li.appendChild(body);
+    li.appendChild(state);
+    return li;
+  }
+
+  async function loadStatus() {
+    refreshButton.disabled = true;
+    refreshButton.textContent = '检测中…';
+    try {
+      const response = await fetch('/api/setup/status');
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error('status failed');
+
+      wechatStatus.textContent = data.wechat_running ? '已检测到微信正在运行' : '暂未检测到微信运行';
+      wechatStatus.classList.toggle('is-running', Boolean(data.wechat_running));
+      summary.textContent = data.wechat_running
+        ? '可以继续检测目录或提取密钥。'
+        : '提取密钥前，请先启动并登录微信；其他步骤仍可查看。';
+
+      stepsEl.replaceChildren();
+      (data.steps || []).forEach((step, index) => {
+        stepsEl.appendChild(renderStep(step, index, data.next_step));
+      });
+
+      if (data.complete) {
+        success.hidden = false;
+        manualLinks.hidden = true;
+        nextBar.hidden = true;
+        summary.textContent = '所有准备步骤均已完成。';
+      } else {
+        const next = actions[data.next_step] || { href: '/setup', label: '继续设置' };
+        success.hidden = true;
+        manualLinks.hidden = false;
+        nextHint.textContent = '下一步：' + next.label;
+        nextAction.textContent = next.label;
+        nextAction.href = next.href;
+        nextBar.hidden = false;
+      }
+    } catch (error) {
+      wechatStatus.textContent = '暂时无法检测微信状态';
+      wechatStatus.classList.remove('is-running');
+      summary.textContent = '状态读取失败，可使用下方链接手动进入备份或提钥。';
+      nextBar.hidden = true;
+      manualLinks.hidden = false;
+      if (!stepsEl.children.length) {
       const li = document.createElement('li');
       li.className = 'config-panel';
-      li.style.margin = '0';
-      const href = mapLink[s.id] || '/';
-      li.innerHTML =
-        '<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">' +
-        '<div><strong>' + (i + 1) + '. ' + s.title + '</strong>' +
-        '<div style="font-size:12px;color:var(--px-muted);margin-top:4px">' + (s.hint || '') + '</div></div>' +
-        '<div>' + (s.done
-          ? '<span style="color:var(--px-accent,#3d8)">已完成</span>'
-          : '<a class="btn btn-primary" href="' + href + '">去完成</a>') +
-        '</div></div>';
+        li.textContent = '无法载入步骤状态，请重新检测或手动打开对应页面。';
       stepsEl.appendChild(li);
-    });
-    if (data.complete) {
-      document.getElementById('btn-open-viewer').style.display = '';
-      document.getElementById('btn-open-export').style.display = '';
+      }
+    } finally {
+      refreshButton.disabled = false;
+      refreshButton.textContent = '重新检测';
     }
-  } catch (e) {
-    summary.textContent = '无法读取向导状态，请手动打开「备份」与「提钥」。';
   }
+
+  refreshButton.addEventListener('click', loadStatus);
+  loadStatus();
 })();
 </script>
 {% endblock %}

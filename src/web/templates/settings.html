@@ -3,9 +3,50 @@
 {% block content %}
 <a href="/" class="back-link">← 返回仪表盘</a>
 <h2 style="margin:0 0 4px 0">⚙️ 设置</h2>
-<p style="color:#8fb9a6;font-size:12px;margin:0 0 20px 0">语音转文字（ASR）引擎与凭据设置</p>
+<p style="color:#8fb9a6;font-size:12px;margin:0 0 20px 0">界面偏好、备份默认项，以及语音转文字（ASR）</p>
 
-<div class="config-panel">
+<div class="config-panel" id="prefs-panel">
+  <h3 style="margin:0 0 12px 0;font-size:15px;color:#eee">界面与默认行为</h3>
+  <div class="form-row" style="flex-wrap:wrap">
+    <div style="flex:1;min-width:160px">
+      <label for="cfg-ui-theme">界面主题</label>
+      <select id="cfg-ui-theme">
+        <option value="pixel">像素风</option>
+        <option value="youth">青春风</option>
+        <option value="tech">科技风</option>
+        <option value="anime">动漫风</option>
+        <option value="wechat">微信原始风</option>
+        <option value="qq">QQ 复古风</option>
+      </select>
+    </div>
+    <div style="flex:1;min-width:160px">
+      <label for="cfg-default-export-format">默认导出格式</label>
+      <select id="cfg-default-export-format">
+        <option value="html">HTML（对话气泡）</option>
+        <option value="xlsx">Excel</option>
+        <option value="txt">TXT</option>
+        <option value="csv">CSV</option>
+        <option value="notes-pack">笔记包</option>
+      </select>
+    </div>
+    <div style="flex:1;min-width:160px">
+      <label for="cfg-backup-days-pref">日常备份默认范围</label>
+      <select id="cfg-backup-days-pref">
+        <option value="30">最近 30 天</option>
+        <option value="7">最近 7 天</option>
+        <option value="90">最近 90 天</option>
+        <option value="365">最近 1 年</option>
+        <option value="0">全部记录</option>
+      </select>
+    </div>
+  </div>
+  <p id="prefs-hint" style="margin:10px 0 0;font-size:12px;color:#8fb9a6;line-height:1.7">
+    主题与导出默认保存在本机浏览器；日常备份范围供二次备份使用（首次仍建议全部）。
+    点下方「保存设置」会一并写入这些偏好。
+  </p>
+</div>
+
+<div class="config-panel" style="margin-top:16px">
   <h3 style="margin:0 0 12px 0;font-size:15px;color:#eee">语音转写引擎</h3>
   <label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;font-size:13px;color:#e8f7ee">
     <input type="radio" name="engine" value="local" id="eng-local" style="margin-top:3px">
@@ -64,7 +105,7 @@
 <div class="config-panel" style="margin-top:16px" id="dbdir-panel">
   <h3 style="margin:0 0 12px 0;font-size:15px;color:#eee">微信数据目录</h3>
   <div class="form-row">
-    <div style="flex:2"><label>微信数据目录 (db_storage)</label><input id="cfg-db-dir" placeholder="例如: D:\xwechat_files\wxid_xxx\db_storage"></div>
+    <div style="flex:2"><label>微信数据目录 (db_storage)</label><input id="cfg-db-dir" placeholder="Windows: D:\xwechat_files\wxid_xxx\db_storage　|　macOS: …/xwechat_files/&lt;账号&gt;/db_storage"></div>
   </div>
   <div style="margin-top:8px">
     <button id="btn-deep" class="btn btn-secondary" style="font-size:11px">🔍 深度搜索</button>
@@ -92,6 +133,58 @@ function el(id) { return document.getElementById(id); }
 // 数据目录选择器（备份 / 解密 / 密钥 / 设置 共用同一份 dbdir.js）。
 // 「使用该目录」会 POST /api/keys/dbdir 把目录写进统一配置 —— 不是塞进 ASR 设置里。
 const dirPicker = new DbDirPicker({ inputId: 'cfg-db-dir' });
+
+var THEME_KEY = 'wechat-export-theme';
+var EXPORT_FMT_KEY = 'wechat-export-default-export-format';
+var BACKUP_DAYS_KEY = 'wechat-export-backup-days-pref';
+var THEME_IDS = { pixel:1, youth:1, tech:1, anime:1, wechat:1, qq:1 };
+var EXPORT_FMTS = { html:1, xlsx:1, txt:1, csv:1, 'notes-pack':1 };
+var BACKUP_DAYS = { '0':1, '7':1, '30':1, '90':1, '365':1 };
+
+function loadUiPrefs() {
+  try {
+    var theme = localStorage.getItem(THEME_KEY) || 'pixel';
+    if (!THEME_IDS[theme]) theme = 'pixel';
+    el('cfg-ui-theme').value = theme;
+  } catch (e) { el('cfg-ui-theme').value = 'pixel'; }
+  try {
+    var fmt = localStorage.getItem(EXPORT_FMT_KEY) || 'html';
+    if (!EXPORT_FMTS[fmt]) fmt = 'html';
+    el('cfg-default-export-format').value = fmt;
+  } catch (e) { el('cfg-default-export-format').value = 'html'; }
+  try {
+    var days = localStorage.getItem(BACKUP_DAYS_KEY) || '30';
+    if (!BACKUP_DAYS[days]) days = '30';
+    el('cfg-backup-days-pref').value = days;
+  } catch (e) { el('cfg-backup-days-pref').value = '30'; }
+}
+
+function saveUiPrefs() {
+  var theme = el('cfg-ui-theme').value;
+  var fmt = el('cfg-default-export-format').value;
+  var days = el('cfg-backup-days-pref').value;
+  try {
+    if (THEME_IDS[theme]) {
+      localStorage.setItem(THEME_KEY, theme);
+      document.documentElement.setAttribute('data-theme', theme);
+      try {
+        document.dispatchEvent(new CustomEvent('wechat-export:theme', { detail: { theme: theme } }));
+      } catch (e2) { /* ignore */ }
+    }
+    if (EXPORT_FMTS[fmt]) localStorage.setItem(EXPORT_FMT_KEY, fmt);
+    if (BACKUP_DAYS[days]) localStorage.setItem(BACKUP_DAYS_KEY, days);
+  } catch (e) { /* ignore */ }
+}
+
+el('cfg-ui-theme').addEventListener('change', function () {
+  var theme = el('cfg-ui-theme').value;
+  if (!THEME_IDS[theme]) return;
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+    document.documentElement.setAttribute('data-theme', theme);
+    document.dispatchEvent(new CustomEvent('wechat-export:theme', { detail: { theme: theme } }));
+  } catch (e) { /* ignore */ }
+});
 
 var AVAILABLE = [];
 
@@ -159,11 +252,12 @@ function collect() {
 }
 
 function save() {
+  saveUiPrefs();
   fetch("/api/settings/asr", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify(collect()) })
     .then(function (r) { return r.json(); })
     .then(function (st) {
-      el("save-msg").textContent = st.warning || "✅ 已保存";
+      el("save-msg").textContent = st.warning || "✅ 已保存（含界面偏好）";
       el("save-msg").style.color = st.warning ? "#ffb020" : "#4ecf8a";
       if (st.has_baidu_key !== undefined) {
         if (st.baidu_api_key) el("cfg-baidu-key").value = st.baidu_api_key;
@@ -237,6 +331,7 @@ el("btn-test-baidu").addEventListener("click", testBaidu);
 el("btn-model-download").addEventListener("click", downloadModel);
 el("eng-baidu").addEventListener("change", function () { save(); });
 el("eng-local").addEventListener("change", function () { save(); });
+loadUiPrefs();
 loadSettings();
 </script>
 {% endblock %}
