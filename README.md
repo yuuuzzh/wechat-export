@@ -1,7 +1,7 @@
 ﻿# WeChat Export · 微信导出
 
 > **维护者**：yuuu · **仓库**：https://github.com/yuuuzzh/wechat-export  
-> **版本**：2.14.20261122（正式版 `v0.4.0`）· **平台**：Windows 10/11（完整）· macOS / Linux（分析导出）· **微信**：4.x（已测 4.1.9 / 4.1.10 / 4.1.12.55 / 4.1.15.11）  
+> **版本**：2.15.20261123（正式版 `v0.5.0`）· **平台**：Windows 10/11（完整）· macOS / Linux（分析导出）· **微信**：4.x（已测 4.1.9 / 4.1.10 / 4.1.12.55 / 4.1.15.11）  
 > **定位**：本地完成微信聊天记录的**分析、搜索与多格式导出**（备份是前置步骤）
 
 数据默认不出本机 · 可执行文件名 `wechat_exp.exe`（兼容分享包与旧脚本）。界面主题可切换（像素风 / 青春风 / 科技风 / 动漫风 / 微信原始风 / QQ 复古风等，持续完善）。
@@ -478,25 +478,26 @@ python src/main.py voice-export --chat 家族群 --merge-by person --format mp3
 
 - **源码**：https://github.com/yuuuzzh/wechat-export  
 - **维护者**：yuuu  
-- **最新正式 Release**：https://github.com/yuuuzzh/wechat-export/releases/tag/v0.4.0  
-- **Windows 可执行文件**：https://github.com/yuuuzzh/wechat-export/releases/download/v0.4.0/WeChatExport-v0.4.0-windows-x64.exe  
+- **最新正式 Release**：https://github.com/yuuuzzh/wechat-export/releases/tag/v0.5.0  
+- **Windows 可执行文件**：用本机 `quick_build.bat` / `build.bat` 打包，或见 Release 附件（若已上传）
 
 下载 exe 后双击即可；也可本地执行 `quick_build.bat` / `build.bat` 自行打包。分享包目录：`share_package/`（模板与说明）。macOS / Linux 请用源码：`python src/main.py`（详见 `docs/platform.md`）。
 
-### 8.1 `v0.4.0`（2026-11-22）
+### 8.1 `v0.5.0`（2026-11-23）
 
-相对 `v0.3.0` 的主要变化：
+相对 `v0.4.0` 的主要变化：**面向真实用户的体验大版本**。
 
 | 方向 | 内容 |
 |------|------|
-| 笔记包 | Obsidian / Notion / Logseq：按日 Markdown + 附件；尽量解密 `.dat`；CLI 可导出 |
-| 异步备份 UX | 后台任务可离开页面；右上角进度条；首次使用引导更清晰 |
-| 群聊日报 | 今日 / 昨日 / 近 7·30 天统计 + 沉默成员 + 独立 HTML（本地确定性） |
-| Reader Skill | Agent 只读接入：`/api/health` · `/api/capabilities` · `/api/skill/...` |
-| macOS / Linux | 手动密钥 / 已解密备份 → 分析导出；窄屏适配；Mac 低风险引导条 |
-| 工作区与向导 | 多备份根切换；首次向导；报告一键 PDF；EML·mbox；导出插件脚本 |
+| 首次引导 | 未备份时首页聚焦下一步；向导可操作；顶栏常用入口（聊天/搜索/导出/备份） |
+| 导出体验 | 常用/更多格式分层；勾选后条数与耗时粗估；最近导出历史；完成态打开文件夹 |
+| 搜索体验 | 简单搜索优先；无备份/无索引醒目 CTA；高级语法默认折叠 |
+| 回来续用 | 仪表盘「最近使用」+ 场景模板（导某人聊天 / 群日报 / 语音留给家人） |
+| 安全与提示 | 清理需勾选确认并输入 DELETE；媒体补迁确认；黑窗口说明；密钥页行内错误 |
+| 媒体缺失 | 图片/语音失败统一说明 + 媒体完整性 / 重新备份入口 |
+| 备份进度 | 阶段文案人话化；首次默认全部记录 |
 
-上一正式版 `v0.3.0`（2026-11-02）已含：话题/事件时间线、关系图谱、跨年对比、语音转写进 FTS。
+上一正式版 `v0.4.0`（2026-11-22）已含：笔记包、异步备份、群聊日报、Reader Skill、macOS/Linux 分析导出、工作区与向导、EML·mbox、导出插件。
 
 > `build.bat` 可能改写 `wechat_exp.spec`，构建后请还原仓库中的手工维护版本。
 
@@ -504,4 +505,4 @@ python src/main.py voice-export --chat 家族群 --merge-by person --format mp3
 
 ---
 
-**最后更新**：2026-11-22 · WeChat Export by yuuu · 最新正式 tag `v0.4.0`
+**最后更新**：2026-11-23 · WeChat Export by yuuu · 最新正式 tag `v0.5.0`

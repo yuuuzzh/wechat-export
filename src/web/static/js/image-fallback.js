@@ -26,8 +26,29 @@
            (extraStyle || "") + "\" onclick=\"" + onclick + "\">" + label + "</button>";
   }
 
+  function helpLinks() {
+    return "<span class=\"media-miss-links\">先查看 <a href=\"/media-integrity\">媒体完整性</a>" +
+           "；仍缺失时请 <a href=\"/backup\">重新备份</a></span>";
+  }
+
+  function callout(reason, action, extra) {
+    return "<div class=\"media-miss-callout\">" +
+      "<div class=\"media-miss-reason\">" + reason + "</div>" +
+      "<div class=\"media-miss-action\">" + action + "</div>" +
+      helpLinks() + (extra || "") + "</div>";
+  }
+
+  function retryButton(imgId) {
+    return "<div class=\"media-miss-buttons\">" +
+      btn("🔄 重试", "ImageFallback.retry(this)", "").replace(
+        "onclick=\"ImageFallback.retry(this)\"",
+        "data-img=\"" + imgId + "\" onclick=\"ImageFallback.retry(this)\""
+      ) +
+      "</div>";
+  }
+
   function actionButtons(st, imgId) {
-    var html = "<div style=\"margin-top:8px\">";
+    var html = "<div class=\"media-miss-buttons\">";
     if (!st || !st.installed) {
       html += btn("⬇ 一键安装 ffmpeg（约 100MB）", "ImageFallback.install(this)");
       html += " <a class=\"btn\" style=\"padding:4px 10px;font-size:11px;text-decoration:none;display:inline-block\" " +
@@ -41,24 +62,26 @@
     return html;
   }
 
-  function renderBox(box, st, imgId) {
+  function renderBox(box, st, imgId, kind) {
     var target = (st && st.targetPath) ? st.targetPath : "(程序目录)\\tools\\ffmpeg.exe";
-    var head, detail;
-    if (!st || !st.installed) {
-      head = "该图片是微信 wxgf(H.265) 格式，显示原图需要 ffmpeg";
-      detail = "① 点「一键安装 ffmpeg」自动下载并放到 <code>" + target + "</code><br>" +
-               "② 或手动下载后把 <code>bin\\ffmpeg.exe</code> 放进同一目录<br>" +
-               "③ 安装完成后本页会<b>自动转换并显示原图</b>（无需重启程序）<br>" +
-               "<span style=\"color:#6e7681\">没有 ffmpeg 时，只会显示图片自带的小缩略图。</span>";
-    } else {
-      head = "图片解码失败";
-      detail = "已检测到 ffmpeg：" + (st.ffmpeg || "") + "<br>" +
-               "请在微信里打开一次这张图片（让它下载到本地），再点「重试」。";
+    var reason, action, extra, buttons;
+    if (kind === "v2") {
+      reason = "这张图片使用 V2 加密，当前备份中可能缺少可用的解密密钥。";
+      action = "请先在微信中打开对应聊天并滚动到这张图片，等待原图下载后再重试。";
+      box.innerHTML = callout(reason, action, retryButton(imgId));
+      return;
     }
-    box.innerHTML = "<div style=\"color:#d29922;font-size:12px;font-weight:600;margin-bottom:6px\">" + head + "</div>" +
-      "<div style=\"color:#8b949e;font-size:11px;line-height:1.9;text-align:left\">" + detail + "</div>" +
-      "<div class=\"wxgf-progress\" style=\"color:#58a6ff;font-size:11px;margin-top:6px;display:none\"></div>" +
-      actionButtons(st, imgId);
+    if (!st || !st.installed) {
+      reason = "图片可能是微信 wxgf(H.265) 格式，显示原图需要 ffmpeg。";
+      action = "可一键安装到 <code>" + target + "</code>，或手动把 <code>bin\\ffmpeg.exe</code> 放入该目录；安装后会自动重试。";
+      extra = "<div class=\"media-miss-note\">没有 ffmpeg 时，通常只能显示图片自带的小缩略图。</div>";
+    } else {
+      reason = "图片未完整下载、已被清理，或当前文件无法解码。";
+      action = "请在微信中打开对应聊天并滚动到这张图片，等待下载完成后再重试。";
+      extra = st.ffmpeg ? "<div class=\"media-miss-note\">已检测到 ffmpeg：" + st.ffmpeg + "</div>" : "";
+    }
+    buttons = "<div class=\"wxgf-progress\" style=\"display:none\"></div>" + actionButtons(st, imgId);
+    box.innerHTML = callout(reason, action, extra + buttons);
   }
 
   function retryEl(img) {
@@ -170,8 +193,12 @@
       box.style.display = "block";
       box.innerHTML = "<div style=\"color:#8b949e;font-size:11px\">正在检查图片解码环境…</div>";
       var imgId = img.id || "";
+      if (img.dataset.mediaError === "v2") {
+        renderBox(box, null, imgId, "v2");
+        return;
+      }
       fetchStatus().then(function (st) {
-        renderBox(box, st, imgId);
+        renderBox(box, st, imgId, "");
         if (!st || !st.installed) startAutoWatch();
       });
     },
@@ -184,15 +211,17 @@
 
     install: function () { install(""); },
 
+    callout: callout,
+
     openTools: function () {
       fetch("/api/wxgf/open-tools", { method: "POST" })
         .then(function (r) { return r.json(); })
         .then(function (d) {
-          if (d && d.error) alert("打开目录失败: " + (d.message || d.error));
+          if (d && d.error) setProgress("打开目录失败: " + (d.message || d.error));
           else setProgress("已打开目录：" + (d.toolsDir || ""));
           startAutoWatch();
         })
-        .catch(function (e) { alert("请求失败: " + e); });
+        .catch(function (e) { setProgress("请求失败: " + e); });
     },
   };
 

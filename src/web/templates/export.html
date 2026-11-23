@@ -121,6 +121,11 @@
   <div id="result-content"></div>
 </div>
 
+<section id="export-history" class="export-history" aria-labelledby="export-history-title">
+  <h3 id="export-history-title">最近导出</h3>
+  <div id="export-history-list" aria-live="polite"></div>
+</section>
+
 <div id="select-container" class="select-container" style="display:none"></div>
 
 <style>
@@ -180,6 +185,21 @@
 .format-docs summary { color: var(--px-orange); cursor: pointer; font-weight: 600; }
 .format-docs .page-desc { margin: 8px 0 0; line-height: 1.7; }
 .chat-picker-empty .btn { display: inline-block; margin-top: 12px; }
+.export-eta { color: var(--px-muted); font-weight: 500; }
+.export-history {
+  margin-top: 16px; padding: 14px 16px; background: var(--px-panel);
+  border: 2px solid var(--px-border); box-shadow: 3px 3px 0 var(--px-shadow);
+}
+.export-history h3 { margin: 0 0 8px; font-size: 15px; }
+.export-history-empty { color: var(--px-muted); font-size: 13px; }
+.export-history-list { list-style: none; margin: 0; padding: 0; }
+.export-history-item {
+  display: flex; align-items: baseline; gap: 8px; padding: 6px 0;
+  border-top: 1px solid var(--px-border); font-size: 13px; flex-wrap: wrap;
+}
+.export-history-item:first-child { border-top: 0; }
+.export-history-name { min-width: 0; overflow-wrap: anywhere; }
+.export-history-meta { color: var(--px-muted); font-size: 12px; }
 .select-container {
   background: var(--px-panel); border: 3px solid var(--px-border); border-radius: 0;
   padding: 20px; margin-top: 16px; max-width: 600px; box-shadow: 4px 4px 0 var(--px-shadow);
@@ -229,9 +249,15 @@
     const total = [...selected.values()].reduce(
       (sum, c) => sum + Number(c.msg_count || 0), 0);
     const hasFilters = keywordInput.value.trim() || startInput.value || endInput.value;
+    const estimate = total < 1000 ? '约几秒'
+      : (total < 10000 ? '不到一分钟' : '可能要几分钟');
     summary.textContent = (hasFilters ? '列表合计约 ' : '约 ')
       + total.toLocaleString() + ' 条消息 · 已选 ' + n + ' 个会话'
       + (hasFilters ? '（未计关键词/日期过滤）' : '');
+    const eta = document.createElement('span');
+    eta.className = 'export-eta';
+    eta.textContent = ' · 预计耗时：' + estimate;
+    summary.appendChild(eta);
   }
 
   function render() {
@@ -323,7 +349,7 @@
   updateSummary();
   loadChats();
 
-  new WizardPage({
+  const page = new WizardPage({
     runBtnId: 'btn-run',
     apiUrl: '/api/export/chat',
     steps: ['export'],
@@ -353,6 +379,81 @@
       };
     },
   });
+
+  const historyKey = 'wechat-export-recent-exports';
+  const historyList = document.getElementById('export-history-list');
+
+  function readExportHistory() {
+    try {
+      const value = JSON.parse(localStorage.getItem(historyKey) || '[]');
+      return Array.isArray(value) ? value.slice(0, 5) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function usefulDownloadUrl(url) {
+    if (typeof url !== 'string') return '';
+    return url.startsWith('/') || /^https?:\/\//i.test(url) ? url : '';
+  }
+
+  function renderExportHistory() {
+    const entries = readExportHistory();
+    historyList.innerHTML = '';
+    if (!entries.length) {
+      const empty = document.createElement('p');
+      empty.className = 'export-history-empty';
+      empty.textContent = '还没有导出记录';
+      historyList.appendChild(empty);
+      return;
+    }
+    const list = document.createElement('ul');
+    list.className = 'export-history-list';
+    entries.forEach((entry) => {
+      const item = document.createElement('li');
+      item.className = 'export-history-item';
+      const url = usefulDownloadUrl(entry.download_url);
+      const name = document.createElement(url ? 'a' : 'span');
+      name.className = 'export-history-name';
+      name.textContent = entry.filename || '导出文件';
+      if (url) name.href = url;
+      item.appendChild(name);
+
+      const meta = document.createElement('span');
+      meta.className = 'export-history-meta';
+      const when = entry.time ? new Date(entry.time) : null;
+      const timeText = when && !Number.isNaN(when.getTime())
+        ? when.toLocaleString('zh-CN', { hour12: false })
+        : '';
+      meta.textContent = [entry.format, timeText].filter(Boolean).join(' · ');
+      item.appendChild(meta);
+      list.appendChild(item);
+    });
+    historyList.appendChild(list);
+  }
+
+  function recordExport(result) {
+    if (!result || (result.errors && result.errors.length)
+        || (!result.download_url && !result.filename)) return;
+    const entries = readExportHistory();
+    entries.unshift({
+      filename: result.filename || '导出文件',
+      format: document.getElementById('cfg-format').value,
+      time: Date.now(),
+      download_url: usefulDownloadUrl(result.download_url),
+    });
+    try {
+      localStorage.setItem(historyKey, JSON.stringify(entries.slice(0, 5)));
+    } catch (e) { /* localStorage may be unavailable */ }
+    renderExportHistory();
+  }
+
+  const originalShowResult = page.showResult.bind(page);
+  page.showResult = function (result) {
+    originalShowResult(result);
+    recordExport(result);
+  };
+  renderExportHistory();
 
   const privCb = document.getElementById('cfg-privacy');
   const privOpts = document.getElementById('privacy-opts');

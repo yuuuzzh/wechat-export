@@ -63,6 +63,21 @@ class VoicePlayerComponent {
     return m > 0 ? m + '′' + String(s).padStart(2, '0') + '″' : s + '″';
   }
 
+  _showMediaError(msgId) {
+    const box = document.getElementById('vp-media-msg-' + msgId);
+    if (!box) return;
+    box.innerHTML = ImageFallback.callout(
+      '语音未能加载，文件可能未完整备份、已被清理，或当前格式无法播放。',
+      '请在微信中打开对应聊天并播放一次这条语音，然后重新备份。'
+    );
+    box.style.display = '';
+  }
+
+  _hideMediaError(msgId) {
+    const box = document.getElementById('vp-media-msg-' + msgId);
+    if (box) box.style.display = 'none';
+  }
+
   toggle(msgId, url) {
     if (this.activeMsgId === msgId) {
       if (this.audio && !this.audio.paused) {
@@ -86,15 +101,14 @@ class VoicePlayerComponent {
     a.addEventListener('timeupdate', function() { self._updateUI(msgId, 'time'); });
     a.addEventListener('ended', function() { self.stop(); });
     a.addEventListener('error', function() {
-      const dw = document.getElementById('voice-download');
-      if (dw) { dw.href = url; dw.style.display = 'inline-block'; }
+      self._showMediaError(msgId);
       self.stop();
     });
     a.play().then(function() {
+      self._hideMediaError(msgId);
       self._updateUI(msgId, 'play');
     }).catch(function() {
-      const dw = document.getElementById('voice-download');
-      if (dw) { dw.href = url; dw.style.display = 'inline-block'; }
+      self._showMediaError(msgId);
       self.stop();
     });
   }

@@ -4,6 +4,7 @@
 <a href="/" class="back-link">&larr; 返回仪表盘</a>
 <h2 style="margin:0 0 4px 0">🔑 提取密钥</h2>
 <p style="color:#8fb9a6;font-size:12px;margin:0 0 16px 0">从微信进程中提取 SQLCipher 数据库解密密钥</p>
+<div id="keyscan-inline-error" class="inline-error" role="alert" aria-live="assertive" hidden></div>
 
 <div class="config-panel">
   <!-- 微信数据目录（与一键备份页同形）：留空则后端自动探测第一个 -->
@@ -100,7 +101,10 @@ function escapeHtml(str) {
 
 // 数据目录选择器：自动检测 / 深度搜索 / 使用该目录（记住到配置）
 // 提示行会显示"检测到 N 个数据目录 + 微信是否在运行 + 推荐第几个（带后端标注）"。
-const dirPicker = new DbDirPicker({ inputId: 'cfg-db-dir' });
+const dirPicker = new DbDirPicker({
+  inputId: 'cfg-db-dir',
+  messageId: 'keyscan-inline-error',
+});
 
 // 两种提取（内存扫描 / Hook）共用同一份请求体构造：
 // 输入框为空 ⇒ **不带** `db_dir` 这个键（后端会回落到配置 → 自动探测第一个）。

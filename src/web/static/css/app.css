@@ -499,6 +499,17 @@ body:has(#cleanup-app) #content { max-width: none; padding: 0; margin: 0; }
 .link-plc { border-color: rgba(255,213,79,0.2); }
 .card-plc { border-color: rgba(120,144,156,0.2); }
 .emoji-plc { border-color: rgba(186,104,200,0.2); }
+
+/* Shared image / voice missing-media guidance */
+.media-miss-callout { padding: 12px; color: var(--px-muted); background: rgba(210,153,34,0.06); border: 1px solid rgba(210,153,34,0.28); text-align: left; font-size: 11px; line-height: 1.65; }
+.media-miss-reason { color: var(--px-gold); font-size: 12px; font-weight: 600; }
+.media-miss-action { margin-top: 3px; color: var(--px-text); }
+.media-miss-links { display: block; margin-top: 5px; }
+.media-miss-links a { color: #58a6ff; text-decoration: none; }
+.media-miss-links a:hover { text-decoration: underline; }
+.media-miss-note { margin-top: 5px; color: var(--px-dim); }
+.media-miss-buttons { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.media-miss-callout .wxgf-progress { color: #58a6ff; font-size: 11px; margin-top: 6px; }
 .file-plc { border-color: rgba(255,138,101,0.2); }
 
 .pagination-bar {
@@ -2160,5 +2171,104 @@ body:has(#cleanup-app) #content { max-width: none; padding: 0; margin: 0; }
     padding: 0 0 12px;
     border-right: 0;
     border-bottom: 2px solid var(--px-border);
+  }
+}
+
+/* Dashboard scenario shortcuts for returning users */
+.dash-scene-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 2px solid var(--px-border);
+}
+.dash-scene-heading {
+  margin-bottom: 10px;
+}
+.dash-scene-heading h3 {
+  margin: 2px 0 0;
+  color: var(--px-text);
+  font-family: var(--font-display);
+  font-size: 17px;
+}
+.dash-scene-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.dash-scene-card {
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+}
+.dash-scene-card .card-desc {
+  flex: 1;
+}
+.dash-scene-action {
+  align-self: flex-start;
+  margin-top: 12px;
+}
+@media (max-width: 760px) {
+  .dash-scene-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Shared inline feedback */
+.inline-error {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  color: var(--px-danger);
+  background: color-mix(in srgb, var(--px-danger) 8%, var(--px-panel));
+  border: 2px solid var(--px-danger);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.inline-error[hidden] { display: none; }
+.console-tip p { margin: 0 0 10px; line-height: 1.7; }
+
+/* Narrow forms: stack the dense export, settings, and search controls */
+@media (max-width: 720px) {
+  body:has(#cfg-chat-q) .config-panel .form-row,
+  body:has(#prefs-panel) .config-panel .form-row,
+  body:has(#search-input) .config-panel .form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  body:has(#cfg-chat-q) .config-panel .form-row > div,
+  body:has(#prefs-panel) .config-panel .form-row > div,
+  body:has(#search-input) .config-panel .form-row > div {
+    min-width: 0 !important;
+    width: 100%;
+  }
+  body:has(#cfg-chat-q) .config-panel input:not([type="checkbox"]):not([type="radio"]),
+  body:has(#cfg-chat-q) .config-panel select,
+  body:has(#prefs-panel) .config-panel input:not([type="checkbox"]):not([type="radio"]),
+  body:has(#prefs-panel) .config-panel select,
+  body:has(#search-input) .config-panel input:not([type="checkbox"]):not([type="radio"]),
+  body:has(#search-input) .config-panel select {
+    width: 100%;
+    min-width: 0;
+  }
+  .export-search-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .export-search-row .btn {
+    width: 100%;
+    text-align: center;
+  }
+  body:has(#cfg-chat-q) .config-panel .form-row > div > .btn,
+  body:has(#prefs-panel) .config-panel .form-row > div > .btn,
+  body:has(#search-input) .config-panel .form-row > div > .btn {
+    width: 100%;
+    text-align: center;
+  }
+  body:has(#search-input) #search-help-toggle { width: 100%; }
+  .export-history-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  #top-nav .nav-primary {
+    max-width: 52vw;
   }
 }

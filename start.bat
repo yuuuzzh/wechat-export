@@ -52,7 +52,8 @@ if not defined PY (
 
 echo [*] Source mode: "%PY%" src\main.py
 echo [*] Open http://127.0.0.1:5000 in your browser if it does not open automatically
-echo [*] Do not close this window; press Ctrl+C to stop
+echo [i] This black window is the normal local service, not an error.
+echo [i] Keep it open while using the web page. Press Ctrl+C to stop.
 echo.
 
 :: Prefer backup created by packaged exe under dist\backup
@@ -79,7 +80,10 @@ goto :eof
 
 :opened
 echo.
-echo Browser should open http://127.0.0.1:5000
-echo Do not close the program console window.
+echo ============================================================
+echo   Browser should open http://127.0.0.1:5000
+echo   The black console window is normal - keep it open.
+echo   Closing it will stop the local web service.
+echo ============================================================
 timeout /t 3 >nul
 goto :eof

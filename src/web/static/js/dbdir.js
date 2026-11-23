@@ -32,6 +32,7 @@ class DbDirPicker {
     this.searchBtnId = opts.searchBtnId || "btn-deep";
     this.useBtnId = opts.useBtnId || "btn-use-dir";
     this.hintId = opts.hintId || "dir-hint";
+    this.messageId = opts.messageId || "";
     this.autoload = opts.autoload !== false;
     this.onChange = opts.onChange || null;
     this.bind();
@@ -45,6 +46,17 @@ class DbDirPicker {
   setHint(html) {
     const h = this.el(this.hintId);
     if (h) h.innerHTML = html;
+  }
+
+  showMessage(message) {
+    const box = this.messageId ? this.el(this.messageId) : null;
+    if (!box) {
+      if (message) alert(message);
+      return;
+    }
+    box.textContent = message || "";
+    box.hidden = !message;
+    if (message) box.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
   bind() {
@@ -226,7 +238,8 @@ class DbDirPicker {
   useDir() {
     const inp = this.input();
     const path = inp ? inp.value.trim() : "";
-    if (!path) { alert("请先填写或选择一个微信数据目录"); return; }
+    this.showMessage("");
+    if (!path) { this.showMessage("请先填写或选择一个微信数据目录"); return; }
     fetch("/api/keys/dbdir", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -234,10 +247,10 @@ class DbDirPicker {
     })
       .then((r) => r.json())
       .then((data) => {
-        if (data.error) { alert("失败: " + (data.message || data.error)); return; }
+        if (data.error) { this.showMessage("失败: " + (data.message || data.error)); return; }
         if (inp) inp.value = data.dbDir;
         this.setHint("✅ 已记住数据目录：<code>" + data.dbDir + "</code>（备份 / 解密 / 密钥都会使用它）");
       })
-      .catch((e) => alert("请求失败: " + e));
+      .catch((e) => this.showMessage("请求失败: " + e));
   }
 }

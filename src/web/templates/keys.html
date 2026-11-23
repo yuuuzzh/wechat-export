@@ -6,6 +6,7 @@
 <p style="color:#8fb9a6;font-size:12px;margin:0 0 16px 0">
   手上已经有密钥？直接粘贴进来。程序会逐个数据库做 HMAC 实测校验，配对成功后写入配置，
   此后「解密数据库」「一键备份」「聊天导出」「聊天查看器」等功能都能直接使用，无需再提取密钥。</p>
+<div id="keys-inline-error" class="inline-error" role="alert" aria-live="assertive" hidden></div>
 
 <aside data-mac-guide="compact" style="margin-bottom:16px"></aside>
 
@@ -96,6 +97,12 @@ table.kv-table th { text-align:left; padding:6px 8px; color:#8fb9a6; font-size:1
 <script>
 function el(id) { return document.getElementById(id); }
 function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+function showError(message) {
+  const box = el("keys-inline-error");
+  box.textContent = message || "";
+  box.hidden = !message;
+  if (message) box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
 
 function currentDir() { return el("cfg-db-dir").value || ""; }
 
@@ -151,16 +158,17 @@ function deepSearch() {
 
 function useManualDir() {
   const path = el("cfg-manual-dir").value.trim();
-  if (!path) { alert("请先填写微信数据目录路径"); return; }
+  showError("");
+  if (!path) { showError("请先填写微信数据目录路径"); return; }
   fetch("/api/keys/dbdir", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ path: path }) })
     .then(function (r) { return r.json(); })
     .then(function (data) {
-      if (data.error) { alert("失败: " + (data.message || data.error)); return; }
+      if (data.error) { showError("失败: " + (data.message || data.error)); return; }
       el("dir-hint").innerHTML = "✅ 已记住数据目录：<code>" + esc(data.dbDir) + "</code>（备份 / 解密 / 密钥都会用它）";
       return loadDirs("fast").then(loadStatus);
     })
-    .catch(function (e) { alert("请求失败: " + e); });
+    .catch(function (e) { showError("请求失败: " + e); });
 }
 
 const ST = {
@@ -271,12 +279,13 @@ function readLogFile(file) {
       return;
     } catch (e) { /* 落到兜底 */ }
     done(new TextDecoder("utf-8").decode(ab), "UTF-8（有替换字符）");
-  }).catch(function (e) { alert("读取文件失败: " + e); });
+  }).catch(function (e) { showError("读取文件失败: " + e); });
 }
 
 function exportList() {
   const text = el("cfg-text").value;
-  if (!text.trim()) { alert("请先粘贴密钥或选择日志文件"); return; }
+  showError("");
+  if (!text.trim()) { showError("请先粘贴密钥或选择日志文件"); return; }
   el("btn-export").disabled = true;
   fetch("/api/keys/export", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ db_dir: currentDir(), text: text }) })
@@ -296,13 +305,14 @@ function exportList() {
         setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
       });
     })
-    .catch(function (e) { alert("导出失败: " + (e.message || e)); })
+    .catch(function (e) { showError("导出失败: " + (e.message || e)); })
     .then(function () { el("btn-export").disabled = false; });
 }
 
 function submit(save) {
   const text = el("cfg-text").value;
-  if (!text.trim()) { alert("请先粘贴密钥"); return; }
+  showError("");
+  if (!text.trim()) { showError("请先粘贴密钥"); return; }
   const url = save ? "/api/keys/save" : "/api/keys/verify";
   el("btn-save").disabled = true; el("btn-verify").disabled = true;
   fetch(url, { method: "POST", headers: { "Content-Type": "application/json" },
@@ -310,12 +320,12 @@ function submit(save) {
     .then(function (r) { return r.json(); })
     .then(function (data) {
       el("btn-save").disabled = false; el("btn-verify").disabled = false;
-      if (data.error) { alert("失败: " + (data.message || data.error)); return; }
+      if (data.error) { showError("失败: " + (data.message || data.error)); return; }
       renderResults(data, save);
     })
     .catch(function (e) {
       el("btn-save").disabled = false; el("btn-verify").disabled = false;
-      alert("请求失败: " + e);
+      showError("请求失败: " + e);
     });
 }
 

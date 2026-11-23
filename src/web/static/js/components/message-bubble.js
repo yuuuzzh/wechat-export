@@ -125,7 +125,6 @@ class MessageBubble extends Component {
       const isWx4 = mi && mi.file_name && mi.file_name.endsWith('.dat') && !mi.file_name.endsWith('_W.dat');
       const isLive = !!(p.is_live_photo);
       if (imgUrl) {
-        const fallbackMsg = isWx4 ? 'V2加密图片无法解码 — 请在微信中查看该图片后刷新重试' : '图片已过期或不可访问';
         const imgId = `img-${m.id}`;
         const liveBadge = isLive ? '<div style="color:#e04570;font-size:11px;margin-bottom:4px">实况 Live Photo</div>' : '';
         let liveVideo = '';
@@ -139,11 +138,17 @@ class MessageBubble extends Component {
             liveVideo = `<div style="color:#8b949e;font-size:11px;margin-top:6px">实况视频 URL 已识别，本地文件未命中</div>`;
           }
         }
-        body = `<div style="text-align:center">${liveBadge}<img id="${imgId}" class="bubble-image" src="${imgUrl}" alt="${isLive?'实况':'图片'}" onclick="event.stopPropagation();openLightbox('${lightboxUrl}')" onerror="ImageFallback.handle(this)"><div class="img-fallback" style="color:#8b949e;padding:16px;display:none">${fallbackMsg}</div>${liveVideo}${mi&&mi.file_name?`<div style="color:#8b949e;font-size:10px;margin-top:4px">${escapeHtml(mi.file_name)} ${mi.file_size?((mi.file_size/1024).toFixed(1)+' KB'):''}</div>`:''}</div>`;
+        body = `<div style="text-align:center">${liveBadge}<img id="${imgId}" class="bubble-image" src="${imgUrl}" data-media-error="${isWx4?'v2':''}" alt="${isLive?'实况':'图片'}" onclick="event.stopPropagation();openLightbox('${lightboxUrl}')" onerror="ImageFallback.handle(this)"><div class="img-fallback" style="display:none"></div>${liveVideo}${mi&&mi.file_name?`<div style="color:#8b949e;font-size:10px;margin-top:4px">${escapeHtml(mi.file_name)} ${mi.file_size?((mi.file_size/1024).toFixed(1)+' KB'):''}</div>`:''}</div>`;
       } else if (mi && mi.md5) {
-        body = `<div class="nontext-placeholder image-plc"><span>🖼</span><span>图片</span><div style="color:#484f58;font-size:10px;margin-top:4px">MD5: ${escapeHtml(mi.md5.substring(0,16))}... 文件未找到</div></div>`;
+        body = ImageFallback.callout(
+          '图片文件未在当前备份中找到（MD5: ' + escapeHtml(mi.md5.substring(0,16)) + '…）。',
+          '请在微信中打开对应聊天并滚动到这张图片，等待下载后再重新备份。'
+        );
       } else {
-        body = `<div class="nontext-placeholder image-plc"><span>🖼</span><span>图片</span><div style="color:#484f58;font-size:10px;margin-top:4px">媒体文件未找到</div></div>`;
+        body = ImageFallback.callout(
+          '图片文件未在当前备份中找到，可能尚未下载或已被清理。',
+          '请在微信中打开对应聊天并滚动到这张图片，等待下载后再重新备份。'
+        );
       }
       break;
     }
@@ -179,9 +184,13 @@ class MessageBubble extends Component {
           <button class="vp-trans-btn" id="vp-trans-btn-${m.id}" onclick="transcribeVoice(${m.id},'${voiceUrl}')" title="语音转文字">T</button>
           <a href="${voiceUrl}" download class="vp-dl-btn" title="下载语音">⬇</a>
         </div>
+        <div id="vp-media-msg-${m.id}" style="display:none"></div>
         <div class="vp-trans-result" id="vp-result-${m.id}" style="display:none"></div>`;
       } else {
-        body = `<div class="nontext-placeholder voice-plc"><span>🔊</span><span>语音${durText ? ' ' + durText : ''}</span><div style="color:#484f58;font-size:10px;margin-top:4px">音频文件未找到</div></div>`;
+        body = ImageFallback.callout(
+          '语音文件未在当前备份中找到，可能尚未下载或已被清理。',
+          '请在微信中打开对应聊天并播放一次这条语音，然后重新备份。'
+        );
       }
       break;
     }

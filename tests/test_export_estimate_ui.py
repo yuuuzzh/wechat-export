@@ -29,3 +29,21 @@ def test_export_estimate_discloses_unapplied_filters_and_refreshes():
     assert "keywordInput.addEventListener('input', updateSummary)" in text
     assert "startInput.addEventListener('change', updateSummary)" in text
     assert "endInput.addEventListener('change', updateSummary)" in text
+
+
+def test_export_estimate_includes_rough_duration_bands():
+    text = _template()
+    assert "total < 1000 ? '约几秒'" in text
+    assert "total < 10000 ? '不到一分钟'" in text
+    assert "'可能要几分钟'" in text
+    assert "eta.className = 'export-eta'" in text
+
+
+def test_recent_exports_are_persisted_and_rendered():
+    text = _template()
+    assert 'id="export-history"' in text
+    assert "const historyKey = 'wechat-export-recent-exports'" in text
+    assert 'entries.unshift({' in text
+    assert 'entries.slice(0, 5)' in text
+    assert 'download_url: usefulDownloadUrl(result.download_url)' in text
+    assert 'page.showResult = function (result)' in text
