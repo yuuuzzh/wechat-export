@@ -54,6 +54,7 @@
     label: $('search-label'), run: $('search-run'),
     syntax: $('search-syntax'),
     help: $('search-help'), helpToggle: $('search-help-toggle'),
+    advanced: $('search-advanced'),
     bar: $('search-index-bar'), results: $('search-results'),
   };
 
@@ -177,9 +178,14 @@
   if (els.helpToggle && els.help
       && typeof els.helpToggle.addEventListener === 'function') {
     els.helpToggle.addEventListener('click', function () {
-      var show = (els.help.style.display !== 'block');
+      var show = !els.advanced || els.advanced.style.display !== 'block';
+      if (els.advanced) els.advanced.style.display = show ? 'block' : 'none';
       els.help.style.display = show ? 'block' : 'none';
       if (show) els.help.textContent = HELP_TEXT;
+      els.helpToggle.textContent = show ? '收起语法速查' : '语法速查';
+      if (typeof els.helpToggle.setAttribute === 'function') {
+        els.helpToggle.setAttribute('aria-expanded', show ? 'true' : 'false');
+      }
     });
   }
 
@@ -245,6 +251,13 @@
       + ' 条' + coverageText(st);
   }
 
+  function hasBackupData(st) {
+    if (!st || typeof st !== 'object') return false;
+    if (st.source_shards === 0) return false;
+    if (st.source_rows === 0) return false;
+    return true;
+  }
+
   function barHtml() {
     var st = lastStatus;
 
@@ -271,20 +284,34 @@
         + buildButton('构建索引（约 1 分钟，视机器与负载）') + progressBlock(false) + '</div>';
     }
 
-    var notice = SR.statusNotice(st);
-    var out = [];
-    if (notice) {
-      out.push('<div class="search-bar-alert">' + SR.escapeHtml(notice) + '</div>');
+    if (!hasBackupData(st)) {
+      return '<div class="search-index-cta search-index-cta-backup">'
+        + '<div class="search-index-cta-kicker">开始搜索前</div>'
+        + '<div class="search-index-cta-title">还没有可搜索的聊天记录</div>'
+        + '<div class="search-index-cta-copy">请先完成一次备份。备份会读取聊天记录，'
+        + '并准备好搜索所需的数据。</div>'
+        + '<div class="search-index-cta-actions">'
+        + '<a class="btn btn-primary" href="/backup">去备份聊天记录</a></div></div>';
     }
 
     if (st.text_ready === false) {
       // T9-A1 的核心：这是唯一能拦住"关键词查询静默返回 0 条"的地方。
       // 判据必须是 `text_ready`（= schema_ok and fts_rows>0），不是 `ready`。
-      out.push('<div class="progress-detail">全文索引未构建或不可用（fts_rows=0）：'
-        + '关键词搜索会静默返回 0 条，请先构建索引再搜关键词。'
-        + buildButton('一键构建（约 1 分钟，视机器与负载）') + '</div>');
-      out.push(progressBlock(false));
-      return out.join('');
+      return '<div class="search-index-cta">'
+        + '<div class="search-index-cta-kicker">只需准备一次</div>'
+        + '<div class="search-index-cta-title">建立全文索引后才能可靠地搜索</div>'
+        + '<div class="search-index-cta-copy">已找到聊天记录，但全文搜索索引还没准备好。'
+        + '在索引建好前，关键词搜索可能静默返回 0 条。点击下方按钮即可开始，'
+        + '期间仍可留在本页。</div>'
+        + '<div class="search-index-cta-actions">'
+        + buildButton('一键构建（约 1 分钟，视机器与负载）') + '</div>'
+        + progressBlock(false) + '</div>';
+    }
+
+    var notice = SR.statusNotice(st);
+    var out = [];
+    if (notice) {
+      out.push('<div class="search-bar-alert">' + SR.escapeHtml(notice) + '</div>');
     }
 
     if (st.ready === true && st.stale === true) {
@@ -504,6 +531,13 @@
     if (truncated) {
       return '<div class="search-empty-warn">⚠ ' + SR.escapeHtml(truncated) + '</div>';
     }
+    if (st && !hasBackupData(st)) {
+      return '<div class="search-guide search-guide-empty">'
+        + '<div class="search-guide-title">这里还没有聊天记录</div>'
+        + '<div>先完成一次备份，再回来搜索全部聊天内容。</div>'
+        + '<div class="search-guide-actions">'
+        + '<a class="btn btn-primary" href="/backup">去备份聊天记录</a></div></div>';
+    }
     if (st && st.text_ready === false) {
       // T9-A1：**不能**把"0 条结果"呈现成"没有这条消息"。
       // "静默返回 0 条"是本页**自己** text_ready 判据的专属文案（状态条里同一句话），
@@ -519,10 +553,55 @@
         + '「没有这条消息」。</div>';
     }
     if (!st) {
-      return '<div class="empty-msg">没有匹配的消息'
-        + '<div class="search-empty-note">（索引状态未知：未能确认索引是否完整）</div></div>';
+      return '<div class="search-guide search-guide-empty">'
+        + '<div class="search-guide-title">没有匹配的消息</div>'
+        + '<div>可以换一个更短的关键词，或清除日期、会话等筛选条件。</div>'
+        + '<div class="search-empty-note">索引状态暂时未知，未能确认搜索范围是否完整。</div>'
+        + emptyActions() + '</div>';
     }
-    return '<div class="empty-msg">没有匹配的消息</div>';
+    return '<div class="search-guide search-guide-empty">'
+      + '<div class="search-guide-title">没有匹配的消息</div>'
+      + '<div>试试更短的关键词，或减少日期、会话、发送者等筛选条件。</div>'
+      + emptyActions() + '</div>';
+  }
+
+  function hasActiveFilters() {
+    if ((els.chat.value || '').trim() || (els.sender.value || '').trim()
+        || (els.from.value || '').trim() || (els.to.value || '').trim()
+        || (els.label.value || '').trim()) return true;
+    for (var i = 0; i < els.type.options.length; i++) {
+      if (els.type.options[i].selected) return true;
+    }
+    return false;
+  }
+
+  function emptyActions() {
+    var out = '<div class="search-guide-actions">';
+    if (hasActiveFilters()) {
+      out += '<button type="button" class="btn btn-primary search-clear-filters">'
+        + '清除筛选并重试</button>';
+    }
+    out += '<a class="btn btn-secondary" href="/backup">检查或更新备份</a></div>';
+    return out;
+  }
+
+  function softenFilters() {
+    els.chat.value = '';
+    els.sender.value = '';
+    els.from.value = '';
+    els.to.value = '';
+    els.label.value = '';
+    for (var i = 0; i < els.type.options.length; i++) {
+      els.type.options[i].selected = false;
+    }
+    onFormEdited();
+    if ((els.syntax.value || '').trim()) {
+      doSearch(1);
+    } else {
+      els.results.innerHTML = '<div class="search-guide">'
+        + '<div class="search-guide-title">输入关键词后再搜索</div>'
+        + '<div>筛选条件已清除。现在可以输入人名、项目名或一句聊天内容。</div></div>';
+    }
   }
 
   function resultCard(f) {
@@ -668,6 +747,10 @@
             exportHits(b.getAttribute('data-fmt') || 'xlsx');
           });
         });
+      Array.prototype.forEach.call(
+        els.results.querySelectorAll('.search-clear-filters'), function (b) {
+          b.addEventListener('click', softenFilters);
+        });
     }
   }
 
@@ -680,7 +763,8 @@
       return;
     }
     if (typeof SseProgress === 'undefined') {
-      alert('导出组件未加载，请强制刷新页面后重试');
+      els.results.innerHTML = '<div class="error-msg">⚠ '
+        + '导出组件未加载，请强制刷新页面后重试。</div>';
       return;
     }
     var statusEl = $('search-export-status');

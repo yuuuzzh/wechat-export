@@ -3,7 +3,7 @@
 {% block content %}
 <a href="/" class="back-link">← 返回仪表盘</a>
 <h2 class="page-title" style="margin:0 0 4px 0">📦 一键备份</h2>
-<p class="page-desc" style="margin:0 0 16px 0">本工具内的本地备份流水线 · 扫描 → 解密 → 迁移媒体 → 构建索引 · 默认增量</p>
+<p class="page-desc" style="margin:0 0 16px 0">查找微信数据 → 整理为可读备份 → 保存媒体文件 → 准备快速搜索 · 默认只处理变化内容</p>
 
 <aside id="first-backup-tip" class="flow-callout flow-callout-warn" role="note">
   <div class="flow-callout-title">首次必做：请用本页的「开始备份」</div>
@@ -98,13 +98,13 @@
     </div>
   </div>
   <div class="steps-bar" id="steps-bar">
-    <span class="step-item active" data-stage="scan"><span>①</span> 扫描账号</span>
+    <span class="step-item active" data-stage="scan"><span>①</span> 查找微信数据</span>
     <span class="step-arrow">→</span>
-    <span class="step-item" data-stage="decrypt"><span>②</span> 解密数据库</span>
+    <span class="step-item" data-stage="decrypt"><span>②</span> 整理可读备份</span>
     <span class="step-arrow">→</span>
-    <span class="step-item" data-stage="migrate"><span>③</span> 迁移媒体</span>
+    <span class="step-item" data-stage="migrate"><span>③</span> 保存媒体文件</span>
     <span class="step-arrow">→</span>
-    <span class="step-item" data-stage="index"><span>④</span> 构建索引</span>
+    <span class="step-item" data-stage="index"><span>④</span> 准备快速搜索</span>
   </div>
   <div style="margin:0 0 12px 0">
     <button id="btn-run" class="btn btn-primary">开始备份</button>
@@ -169,12 +169,31 @@
   }
 })();
 
+function humanizeBackupDetail(stage, detail) {
+  if (!detail) return '';
+  const exact = {
+    'Detecting WeChat installation...': '正在查找本机微信数据…',
+    'Loading decryption keys...': '正在准备读取备份数据…',
+    'Migrating media files...': '正在保存图片、视频和文件…',
+    'Building search index...': '正在准备快速搜索…',
+    'Index complete': '快速搜索已准备完成',
+  };
+  if (exact[detail]) return exact[detail];
+  return detail
+    .replace(/^Found account:\s*/, '已找到微信账号：')
+    .replace(/^Decrypting with (\d+) keys\.\.\.$/, '正在用 $1 组凭据整理数据库…')
+    .replace(/解密失败\s*\/\s*HMAC不匹配/g, '无法读取（密钥不匹配）')
+    .replace(/HMAC/gi, '密钥校验')
+    .replace(/FTS5/gi, '全文搜索');
+}
+
 const page = new WizardPage({
   formId: 'wizard-form',
   runBtnId: 'btn-run',
   apiUrl: '/api/backup/run',
   jobStorageKey: 'wechat-export-backup-job',
   steps: ['scan', 'decrypt', 'migrate', 'index'],
+  detailFormatter: humanizeBackupDetail,
   getBody: () => {
     const dateFrom = document.getElementById('cfg-date-from').value;
     const dateTo = document.getElementById('cfg-date-to').value;
@@ -204,7 +223,10 @@ page.start = async function () {
       this.rememberJobId(data.job.id);
       this.runBtn.disabled = true;
       this.progressContainer.style.display = 'block';
-      this.updateProgress(data.job.progress || 0, data.job.detail || '备份进行中…');
+      this.updateProgress(
+        data.job.progress || 0,
+        this.formatDetail(data.job.stage, data.job.detail || '备份进行中…')
+      );
       if (data.job.stage) this.setActiveStep(data.job.stage);
       this.appendLog('检测到后台备份仍在进行，已重新接入进度', 'ok');
       this.attachJob('/api/backup/job/' + encodeURIComponent(data.job.id) + '/events');

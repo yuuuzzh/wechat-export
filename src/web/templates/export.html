@@ -27,7 +27,7 @@
     <div id="chat-picker" class="chat-picker">
       <div class="chat-picker-empty">正在加载会话列表…</div>
     </div>
-    <div id="sel-summary" class="sel-summary">已选 0 个会话</div>
+    <div id="sel-summary" class="sel-summary" aria-live="polite">已选 0 个会话</div>
     <div id="export-inline-error" class="inline-error" role="alert" aria-live="polite" hidden></div>
   </div>
 
@@ -200,6 +200,9 @@
   const summary = document.getElementById('sel-summary');
   const qInput = document.getElementById('cfg-chat-q');
   const inlineError = document.getElementById('export-inline-error');
+  const keywordInput = document.getElementById('cfg-keyword');
+  const startInput = document.getElementById('cfg-start');
+  const endInput = document.getElementById('cfg-end');
 
   function showInlineError(message) {
     inlineError.textContent = message;
@@ -219,10 +222,16 @@
 
   function updateSummary() {
     const n = selected.size;
-    const groups = [...selected.values()].filter(c => c.is_group).length;
-    summary.textContent = n
-      ? ('已选 ' + n + ' 个会话' + (groups ? '（群聊 ' + groups + '）' : ''))
-      : '已选 0 个会话（也可在下方用关键词导出前先勾选）';
+    if (!n) {
+      summary.textContent = '已选 0 个会话（也可在下方用关键词导出前先勾选）';
+      return;
+    }
+    const total = [...selected.values()].reduce(
+      (sum, c) => sum + Number(c.msg_count || 0), 0);
+    const hasFilters = keywordInput.value.trim() || startInput.value || endInput.value;
+    summary.textContent = (hasFilters ? '列表合计约 ' : '约 ')
+      + total.toLocaleString() + ' 条消息 · 已选 ' + n + ' 个会话'
+      + (hasFilters ? '（未计关键词/日期过滤）' : '');
   }
 
   function render() {
@@ -307,6 +316,9 @@
     render();
     updateSummary();
   });
+  keywordInput.addEventListener('input', updateSummary);
+  startInput.addEventListener('change', updateSummary);
+  endInput.addEventListener('change', updateSummary);
 
   updateSummary();
   loadChats();

@@ -80,7 +80,7 @@
         alert('预览失败: ' + (e.message || '未知错误'));
       }).finally(function() {
         previewBtn.disabled = false;
-        previewBtn.textContent = '预览删除';
+        previewBtn.textContent = '查看删除范围';
       });
     });
   }

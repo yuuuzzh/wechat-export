@@ -19,6 +19,7 @@
     </div>
   </div>
   <div id="current-banner" style="margin-top:12px;font-size:12px;color:var(--px-muted);line-height:1.6"></div>
+  <div id="versions-inline-msg" class="inline-error" role="status" aria-live="polite" hidden style="margin-top:10px"></div>
 </div>
 
 <div class="config-panel" style="margin-top:16px">
@@ -55,10 +56,21 @@
   const diffBox = document.getElementById('diff-result');
   let versions = [];
 
+  const inlineMsg = document.getElementById('versions-inline-msg');
+
   function esc(s) {
     const d = document.createElement('div');
     d.textContent = s == null ? '' : String(s);
     return d.innerHTML;
+  }
+
+  function showMsg(text, isError) {
+    if (!inlineMsg) return;
+    inlineMsg.hidden = !text;
+    inlineMsg.textContent = text || '';
+    inlineMsg.style.color = isError ? 'var(--px-danger)' : 'var(--px-ok)';
+    inlineMsg.style.borderColor = isError ? 'var(--px-danger)' : 'var(--px-ok)';
+    inlineMsg.style.background = isError ? '#fff0f1' : '#eefaf4';
   }
 
   function fmtTime(ts) {
@@ -85,7 +97,10 @@
 
   function renderList(items) {
     if (!items.length) {
-      listEl.innerHTML = '<p style="margin:0">未发现备份版本。请先在「<a href="/backup">一键备份</a>」完成一次备份。</p>';
+      listEl.innerHTML = '<div style="text-align:center;padding:20px 8px">'
+        + '<p style="margin:0 0 12px">还没有备份版本。先做一次平台内「一键备份」，之后才能对比与回滚。</p>'
+        + '<a class="btn btn-primary" href="/backup" style="text-decoration:none">去一键备份</a>'
+        + '</div>';
       return;
     }
     let html = '<div class="select-list">';
@@ -148,7 +163,12 @@
   }
 
   async function activate(path) {
-    if (!confirm('将工作集切换到此备份？\n聊天查看器 / 分析 / 导出将使用该版本数据。\n\n' + path)) return;
+    const ok = window.confirm(
+      '切换工作集后，聊天查看器 / 搜索 / 导出都会读这个备份版本（可随时再切回来）。\n\n'
+      + path + '\n\n确定切换？'
+    );
+    if (!ok) return;
+    showMsg('');
     try {
       const res = await fetch('/api/backup/versions/activate', {
         method: 'POST',
@@ -158,9 +178,9 @@
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || '切换失败');
       await load();
-      alert('已切换到：' + (data.id || data.path));
+      showMsg('已切换到：' + (data.id || data.path), false);
     } catch (e) {
-      alert('切换失败: ' + (e.message || e));
+      showMsg('切换失败: ' + (e.message || e), true);
     }
   }
 
@@ -218,8 +238,9 @@
   async function runDiff() {
     const oldP = oldSel.value;
     const newP = newSel.value;
-    if (!oldP || !newP) { alert('请先选择两个版本'); return; }
-    if (oldP === newP) { alert('请选择两个不同的版本'); return; }
+    if (!oldP || !newP) { showMsg('请先选择两个版本再对比', true); return; }
+    if (oldP === newP) { showMsg('请选择两个不同的版本', true); return; }
+    showMsg('');
     diffBox.style.display = 'block';
     diffBox.textContent = '对比中…';
     try {

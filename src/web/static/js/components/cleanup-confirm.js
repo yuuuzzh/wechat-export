@@ -17,29 +17,34 @@ class CleanupConfirm extends Component {
         fileListHtml += '</div>';
       }
       return '<div class="cleanup-modal-box">' +
-        '<h3>&#x26a0; 确认删除预览</h3>' +
+        '<h3>&#x26a0; 删除媒体文件预览</h3>' +
         '<div class="cleanup-modal-stats">' +
-        '<div class="cleanup-stat"><span class="cleanup-stat-num">' + p.total_messages.toLocaleString() + '</span> 条消息</div>' +
-        '<div class="cleanup-stat"><span class="cleanup-stat-num">' + p.total_files.toLocaleString() + '</span> 个文件</div>' +
-        '<div class="cleanup-stat"><span class="cleanup-stat-num">' + formatSize(p.total_bytes) + '</span> 磁盘空间</div>' +
+        '<div class="cleanup-stat"><span class="cleanup-stat-num">' + p.total_messages.toLocaleString() + '</span> 条记录涉及媒体</div>' +
+        '<div class="cleanup-stat"><span class="cleanup-stat-num">' + p.total_files.toLocaleString() + '</span> 个媒体文件将删除</div>' +
+        '<div class="cleanup-stat"><span class="cleanup-stat-num">' + formatSize(p.total_bytes) + '</span> 预计释放空间</div>' +
         '</div>' +
-        '<p style="color:#f85149;font-size:13px;margin-top:16px"><strong>此操作直接删除源微信媒体文件，不可撤销！</strong></p>' +
+        '<div role="alert" style="color:#f85149;font-size:13px;line-height:1.7;margin-top:16px">' +
+        '<strong>将永久删除所选范围内的图片、视频和文件，删除后无法恢复。</strong><br>' +
+        '<span style="color:#8b949e">文字聊天记录会保留，不会删除。</span>' +
+        '</div>' +
+        '<label class="check-row" style="margin:14px 0 0;display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#e8f7ee">' +
+        '<input type="checkbox" id="cleanup-ack" style="margin-top:3px">' +
+        '<span>我了解：此操作不可恢复，且只会删媒体、保留文字记录</span></label>' +
         fileListHtml +
         '<div class="cleanup-modal-btns">' +
         '<button class="btn btn-secondary" id="cleanup-modal-cancel">取消</button>' +
-        '<button class="btn btn-danger" id="cleanup-modal-confirm">确认，进入验证</button>' +
+        '<button class="btn btn-danger" id="cleanup-modal-confirm" disabled>确认，进入最终验证</button>' +
         '</div></div>';
     }
     if (data.stage === 'verify') {
       return '<div class="cleanup-modal-box">' +
         '<h3 style="color:#f85149">&#x1f6ab; 最终确认</h3>' +
-        '<p style="font-size:14px;margin:16px 0">此操作将<strong>永久删除</strong>源微信存储中的图片/视频/文件。</p>' +
-        '<p style="font-size:12px;color:#8b949e;margin:8px 0">聊天记录（文字消息）保留不动，仅删除媒体文件节省空间。</p>' +
-        '<p style="font-size:14px;margin:16px 0">请输入 <code>DELETE</code> 以确认：</p>' +
+        '<p style="font-size:14px;line-height:1.7;margin:16px 0">即将<strong>永久删除</strong>源微信存储中的图片/视频/文件；文字聊天记录仍会保留。此操作不可撤销。</p>' +
+        '<p style="font-size:14px;margin:16px 0">请输入 <code>DELETE</code>，下方删除按钮才会启用：</p>' +
         '<input type="text" id="cleanup-delete-input" class="cleanup-delete-input" placeholder="输入 DELETE" autocomplete="off">' +
         '<div class="cleanup-modal-btns">' +
         '<button class="btn btn-secondary" id="cleanup-modal-cancel">取消</button>' +
-        '<button class="btn btn-danger" id="cleanup-modal-verify" disabled>确认删除</button>' +
+        '<button class="btn btn-danger" id="cleanup-modal-verify" disabled>永久删除媒体文件</button>' +
         '</div></div>';
     }
     if (data.stage === 'executing') {
@@ -74,11 +79,19 @@ class CleanupConfirm extends Component {
       if (btn.id === 'cleanup-modal-cancel') {
         CleanupStore.emit('modal-cancel');
       } else if (btn.id === 'cleanup-modal-confirm') {
+        var ack = document.getElementById('cleanup-ack');
+        if (ack && !ack.checked) return;
         CleanupStore.emit('modal-verify');
       } else if (btn.id === 'cleanup-modal-verify') {
         CleanupStore.emit('modal-execute');
       } else if (btn.id === 'cleanup-modal-done') {
         CleanupStore.emit('modal-done');
+      }
+    });
+    this.el.addEventListener('change', function(e) {
+      if (e.target.id === 'cleanup-ack') {
+        var btn = document.getElementById('cleanup-modal-confirm');
+        if (btn) btn.disabled = !e.target.checked;
       }
     });
     CleanupStore.on('modal-stage-changed', function(stage) {

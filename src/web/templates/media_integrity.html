@@ -39,6 +39,23 @@
   <div id="dir-hint" style="color:var(--px-muted);font-size:12px;margin-top:10px;line-height:1.6">
     「可恢复」= 微信源目录或上一版备份里还能找到文件；「已丢失」= 源端也不在，需重新从手机/电脑同步后再备份。
   </div>
+  <div id="media-inline-msg" role="status" aria-live="polite" hidden
+       style="margin-top:10px;padding:8px 10px;border:2px solid var(--px-danger);background:#fff0f1;color:var(--px-danger);font-size:13px"></div>
+  <aside id="media-confirm-panel" class="flow-callout flow-callout-warn" hidden style="margin-top:12px">
+    <div class="flow-callout-title">确认补迁媒体？</div>
+    <p style="margin:0 0 8px;line-height:1.7">
+      将把<strong>可恢复</strong>的缺失图片/视频/语音，从微信源目录或上一版备份复制/硬链到<strong>当前备份</strong>。
+      不会删除聊天文字；已丢失项无法补回。
+    </p>
+    <label class="check-row" style="margin:0 0 10px">
+      <input type="checkbox" id="media-confirm-ack">
+      <span>我了解：只会补可恢复文件，已丢失项仍需重新同步微信后再备份</span>
+    </label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" id="media-confirm-go" class="btn btn-primary" disabled>确认开始补迁</button>
+      <button type="button" id="media-confirm-cancel" class="btn btn-secondary">取消</button>
+    </div>
+  </aside>
 </div>
 
 <div id="summary-panel" class="config-panel" style="margin-top:16px;display:none">
@@ -72,6 +89,21 @@
 <script src="{{ url_for('static', filename='js/sse_progress.js') }}"></script>
 <script>
 (function () {
+  const inlineMsg = document.getElementById('media-inline-msg');
+  const confirmPanel = document.getElementById('media-confirm-panel');
+  const confirmAck = document.getElementById('media-confirm-ack');
+  const confirmGo = document.getElementById('media-confirm-go');
+  const confirmCancel = document.getElementById('media-confirm-cancel');
+
+  function showMsg(text, isError) {
+    if (!inlineMsg) return;
+    inlineMsg.hidden = !text;
+    inlineMsg.textContent = text || '';
+    inlineMsg.style.borderColor = isError ? 'var(--px-danger)' : 'var(--px-ok)';
+    inlineMsg.style.background = isError ? '#fff0f1' : '#eefaf4';
+    inlineMsg.style.color = isError ? 'var(--px-danger)' : 'var(--px-ok)';
+  }
+
   const esc = (s) => {
     const d = document.createElement('div');
     d.textContent = s == null ? '' : String(s);
@@ -157,6 +189,8 @@
     const btn = document.getElementById('btn-scan');
     btn.disabled = true;
     btn.textContent = '体检中…';
+    showMsg('');
+    if (confirmPanel) confirmPanel.hidden = true;
     try {
       const res = await fetch('/api/media/integrity', {
         method: 'POST',
@@ -174,21 +208,43 @@
       }
       renderSummary(data.summary || {});
       renderList(data.missing || [], !!data.missing_truncated);
+      const s = data.summary || {};
+      if ((s.missing || 0) === 0) {
+        showMsg('体检完成：媒体看起来都齐全', false);
+      } else {
+        showMsg(
+          '体检完成：缺失 ' + (s.missing || 0) + ' 项（可恢复 '
+          + (s.recoverable || 0) + ' · 已丢失 ' + (s.lost || 0) + '）',
+          false
+        );
+      }
     } catch (e) {
-      alert('体检失败: ' + (e.message || e));
+      showMsg('体检失败: ' + (e.message || e), true);
     } finally {
       btn.disabled = false;
       btn.textContent = '开始体检';
     }
   }
 
+  function hideConfirm() {
+    if (confirmPanel) confirmPanel.hidden = true;
+    if (confirmAck) confirmAck.checked = false;
+    if (confirmGo) confirmGo.disabled = true;
+  }
+
   function remigrate() {
     if (!lastScan || !(lastScan.summary && lastScan.summary.recoverable > 0)) {
-      alert('没有可恢复的缺失项');
+      showMsg('当前没有可恢复的缺失项。若图片仍显示不出来，可先在微信里打开对应聊天再重新备份/体检。', true);
       return;
     }
-    if (!confirm('将从微信源目录 / 上一版备份补迁可恢复的缺失媒体到当前备份。继续？')) return;
+    showMsg('');
+    if (confirmPanel) confirmPanel.hidden = false;
+    if (confirmAck) confirmAck.checked = false;
+    if (confirmGo) confirmGo.disabled = true;
+  }
 
+  function startRemigrate() {
+    hideConfirm();
     const wrap = document.getElementById('progress-wrap');
     const bar = document.getElementById('progress-bar');
     const detail = document.getElementById('progress-detail');
@@ -219,12 +275,21 @@
       },
       onError: (err) => {
         detail.textContent = '失败: ' + (err.message || err);
+        showMsg('补迁失败: ' + (err.message || err), true);
         document.getElementById('btn-scan').disabled = false;
         document.getElementById('btn-remigrate').disabled = false;
       },
     });
     sse.start();
   }
+
+  if (confirmAck && confirmGo) {
+    confirmAck.addEventListener('change', () => {
+      confirmGo.disabled = !confirmAck.checked;
+    });
+  }
+  if (confirmGo) confirmGo.addEventListener('click', startRemigrate);
+  if (confirmCancel) confirmCancel.addEventListener('click', hideConfirm);
 
   document.getElementById('btn-scan').addEventListener('click', scan);
   document.getElementById('btn-remigrate').addEventListener('click', remigrate);

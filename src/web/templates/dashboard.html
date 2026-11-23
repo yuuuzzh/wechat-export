@@ -26,6 +26,33 @@
 
 <aside data-mac-guide style="margin-bottom:28px"></aside>
 
+<section id="dashboard-recent" class="dash-recent-strip" hidden aria-labelledby="dashboard-recent-title">
+  <div class="dash-recent-head">
+    <div>
+      <div class="dash-recent-kicker">欢迎回来</div>
+      <h2 id="dashboard-recent-title">最近使用</h2>
+    </div>
+    <div class="dash-recent-actions">
+      <a class="btn btn-primary" href="/export" data-dash-recent-visit="export">继续导出</a>
+      <a class="btn" href="/search" data-dash-recent-visit="search">全局搜索</a>
+    </div>
+  </div>
+  <div class="dash-recent-body">
+    <a class="dash-recent-workspace" href="/versions">
+      <span class="dash-recent-label">最近备份</span>
+      <strong id="dash-recent-backup-time">查看备份版本</strong>
+      <span id="dash-recent-workspace-name" class="dash-recent-muted"></span>
+    </a>
+    <div class="dash-recent-chats-wrap">
+      <span class="dash-recent-label">活跃会话</span>
+      <div id="dash-recent-chats" class="dash-recent-chats">
+        <a href="/chat">打开聊天查看器</a>
+      </div>
+    </div>
+  </div>
+  <p id="dash-recent-hint" class="dash-recent-hint" hidden></p>
+</section>
+
 <details id="dashboard-all-features" class="onboard-feature-details" open>
   <summary>查看全部功能</summary>
   <div class="onboard-feature-content">
@@ -209,6 +236,7 @@
   const details = document.getElementById('dashboard-all-features');
   const defaultActions = document.getElementById('dashboard-default-actions');
   const mainAction = document.getElementById('dashboard-main-action');
+  const recent = document.getElementById('dashboard-recent');
   const title = document.getElementById('dashboard-next-title');
   const desc = document.getElementById('dashboard-next-desc');
   const action = document.getElementById('dashboard-next-action');
@@ -239,6 +267,82 @@
     }
   };
 
+  function formatBackupTime(timestamp) {
+    const value = Number(timestamp);
+    if (!value) return '查看备份版本';
+    return new Intl.DateTimeFormat('zh-CN', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    }).format(new Date(value * 1000));
+  }
+
+  function shortPath(path) {
+    if (!path) return '';
+    const parts = String(path).split(/[\\/]/).filter(Boolean);
+    return parts.length > 2 ? '…/' + parts.slice(-2).join('/') : parts.join('/');
+  }
+
+  function showLastVisitHint() {
+    const hint = document.getElementById('dash-recent-hint');
+    const visits = [
+      { key: 'wechat-export-last-export', label: '上次从这里使用了导出', href: '/export', action: '继续导出' },
+      { key: 'wechat-export-last-search', label: '上次从这里使用了搜索', href: '/search', action: '继续搜索' }
+    ].map((item) => ({ ...item, time: Number(localStorage.getItem(item.key) || 0) }))
+      .filter((item) => item.time > 0)
+      .sort((a, b) => b.time - a.time);
+    if (!visits.length) return;
+    const latest = visits[0];
+    hint.replaceChildren(document.createTextNode(latest.label + ' · '));
+    const link = document.createElement('a');
+    link.href = latest.href;
+    link.textContent = latest.action;
+    hint.appendChild(link);
+    hint.hidden = false;
+  }
+
+  async function loadRecentUsage() {
+    recent.hidden = false;
+    document.querySelectorAll('[data-dash-recent-visit]').forEach((link) => {
+      link.addEventListener('click', () => {
+        localStorage.setItem('wechat-export-last-' + link.dataset.dashRecentVisit, String(Date.now()));
+      });
+    });
+    try {
+      showLastVisitHint();
+    } catch (_) {
+      // localStorage can be unavailable in privacy-restricted browsers.
+    }
+
+    const [workspaceResult, chatsResult] = await Promise.allSettled([
+      fetch('/api/workspace').then((response) => response.ok ? response.json() : Promise.reject()),
+      fetch('/api/export/chats').then((response) => response.ok ? response.json() : Promise.reject())
+    ]);
+
+    if (workspaceResult.status === 'fulfilled' && workspaceResult.value.ok) {
+      const workspace = workspaceResult.value;
+      const meta = workspace.current_meta || {};
+      document.getElementById('dash-recent-backup-time').textContent =
+        formatBackupTime(meta.created_at);
+      document.getElementById('dash-recent-workspace-name').textContent =
+        shortPath(workspace.current);
+    }
+
+    if (chatsResult.status === 'fulfilled' && chatsResult.value.ok) {
+      const chats = (chatsResult.value.chats || []).slice(0, 5);
+      if (chats.length) {
+        const container = document.getElementById('dash-recent-chats');
+        container.replaceChildren();
+        chats.forEach((chat) => {
+          const link = document.createElement('a');
+          link.href = '/chat?open=' + encodeURIComponent(chat.username);
+          link.textContent = chat.display_name || chat.username;
+          link.title = (chat.msg_count || 0).toLocaleString('zh-CN') + ' 条消息';
+          container.appendChild(link);
+        });
+      }
+    }
+  }
+
   try {
     const response = await fetch('/api/setup/status');
     const data = await response.json();
@@ -252,6 +356,9 @@
       details.classList.add('dash-ready-features');
       const summary = details.querySelector('summary');
       if (summary) summary.textContent = '全部功能';
+      loadRecentUsage().catch(() => {
+        // The strip keeps its quick links when optional recent data is unavailable.
+      });
       // Prefer browse/analyze before data-collection for returning users.
       const content = details.querySelector('.onboard-feature-content');
       if (content) {

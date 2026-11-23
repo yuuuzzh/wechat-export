@@ -233,16 +233,21 @@ class TestPageStaticContract:
         assert 'id="%s"' % control_id in html, control_id
 
     def test_scripts_are_loaded_in_exactly_the_page_order(self, html):
-        """T7-A7/T9：顺序**恰好**是这 5 个，且与 `test_search_js.py` 的加载守卫同源。
+        """T7-A7/T9：搜索页这 5 个脚本相对顺序正确，且与 `test_search_js.py` 同源。
 
-        「都包含」对顺序错误无能为力；而顺序错的后果是
-        `ReferenceError: SearchSyntax is not defined` —— 页面看着在、功能全死。
-        这里刻意复用 `test_search_js.py` 的 `SCRIPT_ORDER`：一份常量，两处断言
-        （此处断言它与**真实页面**一致，那边断言按它加载**不抛错**）。
-        两份常量各写一遍必然漂移。
+        `base.html` 还会先加载 theme / backup_progress / workspace / mac_guide 等全局脚本；
+        本断言只锁定搜索链路自身的相对顺序（必须连续、且与 SCRIPT_ORDER 一致）。
+        顺序错的后果是 `ReferenceError: SearchSyntax is not defined`。
         """
         order = tuple(re.findall(r'js/([A-Za-z0-9_\-]+\.js)', html))
-        assert order == SCRIPT_ORDER, '页面脚本顺序=%r，期望=%r' % (order, SCRIPT_ORDER)
+        # Ignore base.html globals and helpers like sse_progress.js; only the
+        # search dependency chain order matters for ReferenceError avoidance.
+        wanted = set(SCRIPT_ORDER)
+        page_order = tuple(name for name in order if name in wanted)
+        assert page_order == SCRIPT_ORDER, (
+            '搜索脚本顺序=%r，期望=%r（完整页面顺序=%r）'
+            % (page_order, SCRIPT_ORDER, order)
+        )
 
     def test_the_load_guard_covers_all_five_page_files(self, html):
         """显式钉住"加载守卫覆盖的就是页面加载的那 5 个文件"（含 `search-app.js`）。

@@ -13,6 +13,7 @@ class WizardPage {
     this.method = options.method || 'POST';
     this.getBody = options.getBody || (() => ({}));
     this.chatFieldId = options.chatFieldId || 'cfg-chat';
+    this.detailFormatter = options.detailFormatter || null;
 
     this.form = document.getElementById(this.formId);
     this.runBtn = document.getElementById(this.runBtnId);
@@ -80,22 +81,23 @@ class WizardPage {
 
   handleProgress(data) {
     if (data && data.job_id) this.rememberJobId(data.job_id);
+    const detail = this.formatDetail(data && data.stage, (data && data.detail) || '');
     if (data && data.replay) {
       // Replayed history: update bar/stage, skip flooding the log console.
-      this.updateProgress(data.progress || 0, data.detail || '');
+      this.updateProgress(data.progress || 0, detail);
       if (data.stage && data.stage !== this.currentStage) {
         this.currentStage = data.stage;
         this.setActiveStep(data.stage);
       }
       return;
     }
-    this.updateProgress(data.progress || 0, data.detail || '');
+    this.updateProgress(data.progress || 0, detail);
     if (data.stage && data.stage !== this.currentStage) {
       this.currentStage = data.stage;
       this.setActiveStep(data.stage);
     }
     const cls = data.stage === 'error' ? 'error' : 'ok';
-    this.appendLog(data.detail || '', cls);
+    this.appendLog(detail, cls);
   }
 
   handleDone(data) {
@@ -181,6 +183,15 @@ class WizardPage {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  formatDetail(stage, detail) {
+    if (!this.detailFormatter) return detail;
+    try {
+      return this.detailFormatter(stage || '', detail);
+    } catch (e) {
+      return detail;
+    }
   }
 
   updateProgress(pct, detail) {
