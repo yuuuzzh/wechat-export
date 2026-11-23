@@ -121,7 +121,7 @@
 
 | 项 | 说明 |
 |----|------|
-| 系统 | **Windows 10/11（完整能力）**；**macOS / Linux（源码模式）** 可打开已解密备份、手动导入密钥、分析与导出 |
+| 系统 | **Windows 10/11（完整能力）**；**macOS** 可用源码或 `./quick_build_macos.sh` 打出 `.app`/`.dmg`（分析导出；**未公证**）；**Linux** 源码模式 |
 | 微信 | Windows 微信 4.x（上表已测）；macOS 微信 4.x 可读数据目录，但**自动提取密钥尚未移植** |
 | 磁盘 | 约等于微信数据目录大小（常见 2–10 GB） |
 
@@ -139,16 +139,22 @@
 macOS 快速开始（已有密钥或已解密目录）：
 
 ```bash
+# A) 打包（推荐给不想装 Python 的同学）
+./quick_build_macos.sh
+open "dist/WeChat Export.app"   # 或打开生成的 .dmg，拖到「应用程序」
+# 首次：右键 App → 打开（未公证）
+
+# B) 源码
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-# 打开已解密备份
 python3 src/main.py serve --decrypted-dir "/path/to/backup"
 # 或指定 Mac 微信 db_storage + 手动密钥后再备份
 python3 src/main.py serve --db-dir "$HOME/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/<账号>/db_storage"
 ```
 
-访问微信沙盒目录需在「系统设置 → 隐私与安全性 → 完全磁盘访问权限」允许终端/Python。建议 `brew install ffmpeg`。
-| 运行时 | 独立 exe，**不需要**安装 Python |
+访问微信沙盒目录需在「系统设置 → 隐私与安全性 → 完全磁盘访问权限」允许终端/Python/本 App。建议 `brew install ffmpeg`。打包数据目录：`~/Library/Application Support/WeChatExport/`。详见 `docs/platform.md`。
+
+| 运行时 | Windows：独立 exe；macOS：`.app`/`.dmg` 或源码；**不强制**本机开发环境 |
 
 ---
 

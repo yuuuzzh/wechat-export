@@ -54,10 +54,35 @@ WeChat Export 的查看 / 搜索 / 导出是纯 Python + Flask，本来就可移
 - 窄屏 CSS（聊天侧栏、仪表盘、表单）
 - macOS 低风险引导条（`static/js/mac_guide.js`）
 
+## macOS `.app` / DMG 打包（已支持，未公证）
+
+在本机（Apple Silicon / Intel）执行：
+
+```bash
+chmod +x quick_build_macos.sh start.command
+./quick_build_macos.sh
+```
+
+产物：
+
+| 文件 | 说明 |
+|------|------|
+| `dist/WeChat Export.app` | 双击启动本地 Web 服务（控制台可见日志） |
+| `dist/WeChatExport-v*-macos-arm64.dmg`（或 `x86_64`） | 拖到「应用程序」安装 |
+
+说明：
+
+- **未做 Apple 公证 / Developer ID 签名**（需付费账号）。首次打开请 **右键 → 打开**。
+- 备份与配置写在 `~/Library/Application Support/WeChatExport/`（避免 `/Applications` 不可写）。
+- 能力边界与源码模式相同：**无自动提密钥**；建议手动密钥或已解密备份。
+- 可选：`brew install ffmpeg`；`tools/silk_decoder` 需自行编译后放入 Application Support 的 `tools/` 或仓库 `tools/` 再打包。
+
+也可以不打包，双击 `start.command` 用源码启动。
+
 ## 后续 Phase（未做）
 
 1. macOS 原生密钥提取 helper（工作量最大，需按微信版本维护）
-2. PyInstaller `.app` / DMG、签名公证
+2. Apple Developer ID 签名 + 公证（公证后可双击打开）
 3. `launchd` 定时备份
-4. 编译各架构 `silk_decoder`
+4. 编译各架构 `silk_decoder` 并打进 `.app`
 5. 可选：桌面服务 + 局域网 Token，让手机浏览器只读查看（仍非原生 App）

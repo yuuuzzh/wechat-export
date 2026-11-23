@@ -115,9 +115,10 @@ def _util_data_roots() -> list[str]:
     for p in (decrypted, db_dir, current_app.config.get('PROJECT_ROOT')):
         if p:
             roots.append(os.path.abspath(p))
-    # exe / frozen exe directory (same idea as web.app._project_root)
+    # frozen writable root (.app → Application Support) / repo root
     if getattr(sys, 'frozen', False):
-        roots.append(os.path.dirname(os.path.abspath(sys.executable)))
+        from engine.platform_info import frozen_data_root
+        roots.append(frozen_data_root())
     else:
         # src/web/routes/api.py → parents: routes, web, src, repo
         here = os.path.dirname(os.path.abspath(__file__))

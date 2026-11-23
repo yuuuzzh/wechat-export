@@ -24,7 +24,8 @@ from web.sse import create_sse_progress  # noqa: E402
 voice_export_bp = Blueprint('voice_export_api', __name__, url_prefix='/api/export/voice')
 
 if getattr(sys, 'frozen', False):
-    _DATA_ROOT = os.path.dirname(sys.executable)
+    from engine.platform_info import frozen_data_root
+    _DATA_ROOT = frozen_data_root()
 else:
     _DATA_ROOT = os.path.normpath(os.path.join(_BASE, '..'))
 

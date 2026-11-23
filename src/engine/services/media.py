@@ -1287,11 +1287,13 @@ def _pick_incomplete_candidate(candidates):
 def tools_dir() -> str:
     """本程序的 tools 目录（放 ffmpeg.exe / silk_decoder.exe 的地方）。
 
-    打包运行时 = exe 同目录的 tools\\；源码运行时 = 项目根目录的 tools\\。
+    打包运行时 = 可写数据根下的 tools/（.app → Application Support）；
+    源码运行时 = 项目根目录的 tools/。
     """
     import sys as _sys
     if getattr(_sys, "frozen", False):
-        return os.path.join(os.path.dirname(os.path.abspath(_sys.executable)), "tools")
+        from engine.platform_info import frozen_data_root
+        return os.path.join(frozen_data_root(), "tools")
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(
         os.path.dirname(os.path.abspath(__file__)))))
     return os.path.join(project_root, "tools")

@@ -13,10 +13,13 @@ import sys
 from engine.version import VERSION as __version__
 
 if getattr(sys, 'frozen', False):
-    BASE = os.path.dirname(sys.executable)
+    from engine.platform_info import frozen_data_root as _frozen_data_root
+    BASE = _frozen_data_root()
+    _IMPORT_BASE = os.path.dirname(sys.executable)
 else:
     BASE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, BASE)
+    _IMPORT_BASE = BASE
+sys.path.insert(0, _IMPORT_BASE)
 
 
 def _resolve_decrypted_dir():

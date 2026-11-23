@@ -6,10 +6,11 @@ CONFIG_FILENAME = ".wechat_exp_config.json"
 
 
 def _config_path() -> str:
-    """Config file lives at project root (dev) or next to the exe (frozen)."""
+    """Config file lives at project root (dev) or frozen data root (.app / exe)."""
     import sys as _sys
     if getattr(_sys, 'frozen', False):
-        base = os.path.dirname(_sys.executable)
+        from engine.platform_info import frozen_data_root
+        base = frozen_data_root()
     else:
         # config_file.py → engine/ → src/ → project_root/
         base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

@@ -66,7 +66,8 @@ def _export_dir():
     默认行为与原实现逐字一致，禁止改动这两条分支的语义。
     """
     if getattr(sys, "frozen", False):
-        data_root = os.path.dirname(sys.executable)
+        from engine.platform_info import frozen_data_root
+        data_root = frozen_data_root()
     else:
         data_root = os.path.normpath(os.path.join(_BASE, ".."))
     return os.path.join(data_root, "output")

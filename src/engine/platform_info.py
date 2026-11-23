@@ -27,6 +27,48 @@ def is_linux() -> bool:
     return sys.platform.startswith('linux')
 
 
+def is_macos_app_bundle(executable: str | None = None) -> bool:
+    """True when the frozen binary lives inside ``Something.app/Contents/MacOS``."""
+    exe = os.path.abspath(executable or sys.executable)
+    macos_dir = os.path.dirname(exe)
+    if os.path.basename(macos_dir) != 'MacOS':
+        return False
+    contents = os.path.dirname(macos_dir)
+    if os.path.basename(contents) != 'Contents':
+        return False
+    return os.path.dirname(contents).endswith('.app')
+
+
+def frozen_data_root(executable: str | None = None) -> str:
+    """Writable data root for frozen builds.
+
+    - Windows / bare onedir: directory containing the executable
+    - macOS ``.app``: ``~/Library/Application Support/WeChatExport``
+      (``/Applications`` is not writable for backups/config)
+    """
+    if not getattr(sys, 'frozen', False) and executable is None:
+        # Allow unit tests to pass an explicit path without freezing.
+        pass
+    exe = os.path.abspath(executable or sys.executable)
+    exe_dir = os.path.dirname(exe)
+    if is_macos() and is_macos_app_bundle(exe):
+        support = os.path.join(
+            os.path.expanduser('~'),
+            'Library', 'Application Support', 'WeChatExport',
+        )
+        os.makedirs(support, exist_ok=True)
+        return support
+    return exe_dir
+
+
+def data_root() -> str:
+    """Project/data root: repo root in source mode, :func:`frozen_data_root` when frozen."""
+    if getattr(sys, 'frozen', False):
+        return frozen_data_root()
+    here = os.path.dirname(os.path.abspath(__file__))
+    return os.path.normpath(os.path.join(here, '..', '..'))
+
+
 def system_name() -> str:
     if is_windows():
         return 'windows'
@@ -142,6 +184,10 @@ def _platform_notes() -> list[str]:
         )
         notes.append(
             '建议：brew install ffmpeg；语音 SILK 解码需自行编译 tools/silk_decoder。'
+        )
+        notes.append(
+            '可用 quick_build_macos.sh 打出 WeChat Export.app / .dmg（未公证；'
+            '首次打开请右键 → 打开）。'
         )
     elif is_linux():
         notes.append(

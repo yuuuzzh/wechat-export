@@ -14,7 +14,8 @@ if _BASE not in sys.path:
     sys.path.insert(0, _BASE)
 
 if getattr(sys, 'frozen', False):
-    _DATA_ROOT = os.path.dirname(sys.executable)
+    from engine.platform_info import frozen_data_root
+    _DATA_ROOT = frozen_data_root()
 else:
     _DATA_ROOT = os.path.normpath(os.path.join(_BASE, '..'))
 

@@ -16,9 +16,10 @@ _GITHUB_RAW_SHOTS = (
 
 
 def _project_root() -> str:
-    """Repo root (dev) or directory containing the frozen exe."""
+    """Repo root (dev) or frozen writable data root (.app → Application Support)."""
     if getattr(sys, 'frozen', False):
-        return os.path.dirname(os.path.abspath(sys.executable))
+        from engine.platform_info import frozen_data_root
+        return frozen_data_root()
     # src/web/app.py → parents: web, src, repo
     return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
