@@ -71,7 +71,8 @@
   <div class="wrap">
     <p class="kicker">WeChat Export · 可单独打开的 HTML</p>
     <h1>Mac 手动密钥新手指引</h1>
-    <p class="lead">本工具在 Mac <b>不能一键从微信进程提取密钥</b>。按你的情况选路，再学怎么粘贴到「手动输入密钥」。</p>
+    <p class="lead">本工具在 Mac <b>默认不能一键从微信进程提取密钥</b>：前三条路线走手动密钥 / 已解密备份；
+      第四条「高级一键提钥」需自备 helper 并临时调整系统安全设置。按你的情况选路。</p>
     <div class="progress" id="progress"></div>
     <article class="panel" id="panel"></article>
     <div class="actions">
@@ -82,6 +83,8 @@
       若已运行本程序，建议打开应用内指引：
       <code>http://127.0.0.1:5000/mac-keys-guide</code>
       · 粘贴入口：<code>/keys</code>
+      · 高级提钥页：<code>/keyscan</code>
+      · 完整说明：<code>docs/mac-auto-key.md</code>
     </footer>
   </div>
   <script>
@@ -105,7 +108,9 @@
         + choice('have_backup', '我已经有解密后的备份目录', '可直接浏览，不必再找密钥')
         + choice('have_keys', '我手里已有密钥文本 / 扫描日志', '64 位 hex 或含 [Cipher-FOUND] 的日志')
         + choice('mac_only', '我只有这台 Mac，还不知道密钥在哪', '最常见')
-        + '</div>';
+        + choice('mac_advanced', '我想用「高级模式」一键提钥', '需自备 helper、临时关 SIP、管理员授权')
+        + '</div>'
+        + '<p class="warn">高级模式会调整系统安全设置；不想动系统设置请选前三条路线。</p>';
     }
     function backup() {
       return '<div class="title">有解密备份 → 不用找密钥</div>'
@@ -133,9 +138,37 @@
         + '<li>之后尽量只用本地备份分析导出。</li></ol>'
         + '<p class="warn">勿把含密钥的配置上传公开网盘或发到群里。</p>';
     }
+    function advanced() {
+      return '<div class="title">Mac 高级一键提钥（6 步）</div>'
+        + '<ol>'
+        + '<li><b>前提</b>：arm64 程序、自备 helper、临时关 SIP、微信停在登录页、完全磁盘访问权限。</li>'
+        + '<li><b>放 helper</b>：仓库根执行 <code>./scripts/prepare_mac_key_helper.sh /path/to/TraceMemo/resources</code>；'
+        + '脚本会校验 SHA-256 并逐架构 ad-hoc 签名。</li>'
+        + '<li><b>临时关 SIP</b>：恢复模式 <code>csrutil disable</code> → 重启；'
+        + '<code>csrutil status</code> 显示 disabled 才可继续。</li>'
+        + '<li><b>微信</b>：用 4.1.13.8（备选 4.1.8.100），退出账号停在登录页；4.2.0 大概率 SCAN_FAILED。</li>'
+        + '<li><b>执行</b>：应用内 <code>/keyscan</code> 点「一键提取密钥（高级）」→ 管理员授权 → 回微信点登录。</li>'
+        + '<li><b>收尾</b>：按错误码排查，拿到密钥后 <code>csrutil enable</code> 重新开启 SIP，再去做一键备份。</li>'
+        + '</ol>'
+        + '<p class="note">完整失败码表见 <code>docs/mac-auto-key.md</code>；'
+        + '应用内分步指引：<code>http://127.0.0.1:5000/mac-keys-guide</code>。</p>'
+        + '<p class="warn">helper 二进制不随本项目分发；不要连续重试，以免触发微信安全模式。</p>';
+    }
+    function advancedRun() {
+      return '<div class="title">执行时与失败后</div>'
+        + '<ol>'
+        + '<li>确认诊断 <code>PYTHONPATH=src .venv/bin/python -m engine.services.mac_key</code> 显示「高级模式就绪：是」。</li>'
+        + '<li>点提钥按钮 → 完成管理员授权 → 出现提示后回微信点「登录」，等待进度结束。</li>'
+        + '<li>失败按错误码处理：<code>SIP_ENABLED</code> / <code>ARCH_MISMATCH_X64_ON_ARM</code> / '
+        + '<code>WECHAT_NOT_RUNNING</code> / <code>CAPTURE_TIMEOUT</code> / <code>SCAN_FAILED</code> / '
+        + '<code>HELPER_NOT_FOUND</code> / <code>NO_VERIFIED_KEY</code>。</li>'
+        + '<li>成功后重新开启 SIP，再到「一键备份」生成本地备份。</li>'
+        + '</ol>'
+        + '<p class="note">候选密钥会先过数据库首页 HMAC 校验，错误密钥不会写进配置。</p>';
+    }
     function truth() {
-      return '<div class="title">本工具不会在 Mac「搜出」密钥</div>'
-        + '<p>你需要从别处拿到 64 位密钥，或拿到已解密备份。</p>';
+      return '<div class="title">默认路线不会在 Mac「搜出」密钥</div>'
+        + '<p>你需要从别处拿到 64 位密钥，或拿到已解密备份；也可以选「高级模式」路线。</p>';
     }
     function sources() {
       return '<div class="title">密钥从哪来？</div>'
@@ -143,7 +176,8 @@
         + '<li><b>Windows 电脑提一次</b>（推荐）：同账号微信 + 本工具「提取密钥」，把完整日志拷到 Mac 粘贴。</li>'
         + '<li><b>已有 keys.txt / keyscan.log</b>（未打码）。</li>'
         + '<li><b>已有解密备份</b>：改走备份路线。</li>'
-        + '<li><b>其他 Mac 提钥工具</b>：本项目不捆绑、不引导关 SIP；若你自行取出完整密钥，仍可粘贴回本工具。</li>'
+        + '<li><b>高级模式 / 其他 Mac 提钥工具</b>：本项目不捆绑 helper 二进制；'
+        + '高级模式需自备 helper 并临时关 SIP，若自行取出完整密钥，仍可粘贴回本工具。</li>'
         + '</ol>';
     }
     function list() {
@@ -156,6 +190,10 @@
         { title: '数据目录', html: dbDir() },
         { title: '粘贴', html: paste() },
         { title: '验证', html: verify() }
+      ];
+      if (path === 'mac_advanced') return [
+        { title: '前提', html: advanced() },
+        { title: '执行与收尾', html: advancedRun() }
       ];
       return [
         { title: '认清限制', html: truth() },

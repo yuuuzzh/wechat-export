@@ -39,6 +39,15 @@
 • `scripts/prepare_mac_key_helper.sh`：放置 helper + `codesign --force --sign -` + 逐架构 `--verify --strict`。
 • `docs/mac-auto-key.md`：前置条件、操作步骤、失败码表、安全边界。
 
+## Task 4b — Mac 使用新手指引补齐（v0.6.0 发版后补漏，发布为 v0.6.1，2026-11-24）
+
+发版复核发现：交互式指引只有手动密钥三条路线，高级模式只有 Markdown 文档与页内提示，用户第一次用无从下手。已补齐：
+
+• `mac_keys_guide.html`：新增第 4 条路线 `mac_advanced`，6 步向导（前提总览 → 放 helper → 临时关 SIP → 微信版本/登录页 → 执行提钥 → 失败排查与收尾），含错误码表、完成后重开 SIP、末尾「打开高级提钥页」CTA。
+• `docs/mac-keys-guide.html` 离线版同步新增高级路线与执行/排障步骤；保留原有 3 条手动路线。
+• 入口统一改为「Mac 使用新手指引」：首次向导（含高级模式）、仪表盘 Mac 卡片与 `keysMacAdvanced`、提取密钥页高级区块、手动密钥页、引导条；`docs/mac-auto-key.md` 与 `docs/platform.md` 顶部指向应用内向导。
+• 新增 4 个静态/路由契约测试（分步函数齐全、离线版覆盖、路由渲染、入口文案）；定向 58 个用例通过。
+
 ## Task 5 — 测试与回归（本次交付）
 
 • 新增 `tests/test_tracememo_provider.py`：架构判定、`build_apple_silicon_invocation` profile 分派、失败码映射、JSON 解析、osascript 命令构造、SIP / helper 缺失路径、Intel JSONL、HMAC 裁决闭环、UI/API 静态契约。

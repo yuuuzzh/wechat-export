@@ -12,7 +12,7 @@
     本页的 Windows「一键提取 / Hook」在 Mac 上不可用。默认走新手指引手动粘贴；
     已配置 helper 时可使用下方「高级模式」。
   </p>
-  <a class="btn btn-primary" style="text-decoration:none;font-size:12px" href="/mac-keys-guide">Mac 密钥新手指引</a>
+  <a class="btn btn-primary" style="text-decoration:none;font-size:12px" href="/mac-keys-guide">Mac 使用新手指引</a>
   <a class="btn" style="text-decoration:none;font-size:12px;margin-left:8px" href="/keys">手动输入密钥</a>
 </div>
 <div id="mac-keyscan-advanced" class="flow-callout" style="margin-bottom:16px;display:none">
@@ -21,7 +21,8 @@
     前置条件：① <code>resources/mac/</code> 已放入 xkey_helper（微信 4.1.13 用 xkey_helper_4_1_13）；
     ② 已<strong>临时关闭 SIP</strong> 并重启；③ 微信<strong>退出账号、停在登录页</strong>；
     ④ 点击后会请求<strong>管理员授权</strong>，出现提示后再回微信点「登录」。
-    拿到密钥后请重新开启 SIP。详见 <a href="/mac-keys-guide">Mac 密钥指引</a> 与 docs/mac-auto-key.md。
+    拿到密钥后请重新开启 SIP。<strong>第一次用请先看 <a href="/mac-keys-guide">Mac 使用新手指引（高级模式 6 步）</a></strong>；
+    完整失败码表见 docs/mac-auto-key.md。
   </p>
   <button id="btn-run-mac-advanced" class="btn btn-primary" style="font-size:13px">一键提取密钥（高级）</button>
   <div id="mac-advanced-status" style="margin-top:10px;font-size:12px;line-height:1.7;color:var(--px-muted)"></div>
@@ -383,7 +384,7 @@ fetch('/api/health').then(function (r) { return r.json(); }).then(function (data
     if (advanced) advanced.style.display = 'block';
     if (macAdvancedStatus) {
       macAdvancedStatus.textContent = mk.sip_enabled
-        ? 'helper 已就位，但 SIP 仍开启：请先按 docs/mac-auto-key.md 临时关闭并重启。'
+        ? 'helper 已就位，但 SIP 仍开启：请按 Mac 使用新手指引第 3 步临时关闭并重启。'
         : (mk.capture_ready ? '环境就绪，可以开始提钥。'
           : 'helper 已就位；请启动微信并停在登录页后再开始。');
     }

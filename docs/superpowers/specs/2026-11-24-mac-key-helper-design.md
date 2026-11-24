@@ -68,7 +68,7 @@ Windows 的 `/api/backup/keyscan` 分支完全不变；`auto_key_extract_support
 | `engine/services/mac_key/adapter.py` | 同构策略签名，HMAC 裁决，不落盘 |
 | `engine/services/mac_key/diagnostics.py` / `cli.py` | 只读环境快照与 `--probe` |
 | `web/routes/backup_api.py` | macOS SSE 提钥端点 |
-| `web/routes/setup_api.py` / `templates/{setup,dashboard,keyscan,mac_keys_guide}.html` / `static/js/mac_guide.js` | 高级模式入口与文案 |
+| `web/routes/setup_api.py` / `templates/{setup,dashboard,keyscan,mac_keys_guide,keys}.html` / `static/js/mac_guide.js` | 高级模式入口与用户可见指引；`mac_keys_guide.html` 含 4 条路线，`mac_advanced` 为 6 步高级向导 |
 | `scripts/prepare_mac_key_helper.sh` | helper 放置 + ad-hoc 签名 + 逐架构校验 |
 | `docs/mac-auto-key.md` | 用户可见操作手册与失败码表 |
 

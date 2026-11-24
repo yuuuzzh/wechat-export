@@ -28,7 +28,7 @@
 <div id="setup-manual-links" class="form-row onboard-manual-links" style="gap:12px;flex-wrap:wrap">
   <a class="btn" href="/backup">打开备份页</a>
   <a class="btn" id="setup-link-keys" href="/keyscan">打开提钥页</a>
-  <a class="btn" id="setup-link-mac-guide" href="/mac-keys-guide" hidden>Mac 密钥指引</a>
+  <a class="btn" id="setup-link-mac-guide" href="/mac-keys-guide" hidden>Mac 使用新手指引</a>
 </div>
 
 <div id="setup-next-bar" class="onboard-next-bar" hidden>
@@ -60,8 +60,8 @@
   function applyMacKeysMode(enabled, advanced) {
     if (!enabled) return;
     actions.keys = advanced
-      ? { href: '/keyscan', label: 'Mac 高级提钥' }
-      : { href: '/mac-keys-guide', label: 'Mac 密钥指引' };
+      ? { href: '/mac-keys-guide', label: '看 Mac 使用指引' }
+      : { href: '/mac-keys-guide', label: 'Mac 使用新手指引' };
     if (linkKeys) {
       linkKeys.href = '/keys';
       linkKeys.textContent = '手动输入密钥';

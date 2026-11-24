@@ -1,12 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Mac 手动密钥新手指引 — WeChat Export{% endblock %}
+{% block title %}Mac 使用新手指引 — WeChat Export{% endblock %}
 {% block content %}
 <a href="/" class="back-link">← 返回仪表盘</a>
 <p class="onboard-kicker">macOS · 新手指引</p>
-<h2 class="page-title" style="margin-top:0">Mac 上密钥从哪来？怎么输入？</h2>
+<h2 class="page-title" style="margin-top:0">Mac 上怎么用？先选你的情况</h2>
 <p class="page-desc">
-  本工具在 Mac <strong>默认不能一键从微信进程提取密钥</strong>；自备 helper 的「高级模式」见页面下方说明。
-  下面按你的实际情况选路，一步一步走到「粘贴 → 验证 → 备份」。
+  本工具在 Mac <strong>默认不能一键从微信进程提取密钥</strong>：前三条路线走手动密钥 / 已解密备份；
+  第四条「高级一键提钥」需自备 helper 并临时调整系统安全设置。
+  选一条，按分步提示走到「验证 → 备份」。
 </p>
 
 <div class="mac-keys-progress" id="mac-keys-progress" aria-label="指引进度"></div>
@@ -17,6 +18,7 @@
   <button type="button" class="btn" id="mac-keys-prev" hidden>上一步</button>
   <button type="button" class="btn btn-primary" id="mac-keys-next">下一步</button>
   <a class="btn" href="/keys" id="mac-keys-go-keys" hidden>打开「手动输入密钥」</a>
+  <a class="btn btn-primary" href="/keyscan" id="mac-keys-go-keyscan" hidden>打开高级提钥页</a>
   <a class="btn" href="/backup" id="mac-keys-go-backup" hidden>去备份</a>
 </div>
 {% endblock %}
@@ -28,12 +30,14 @@
   const btnPrev = document.getElementById('mac-keys-prev');
   const btnNext = document.getElementById('mac-keys-next');
   const goKeys = document.getElementById('mac-keys-go-keys');
+  const goKeyscan = document.getElementById('mac-keys-go-keyscan');
   const goBackup = document.getElementById('mac-keys-go-backup');
 
   const PATH_LABEL = {
     have_backup: '已有解密备份',
     have_keys: '已有密钥 / 扫描日志',
-    mac_only: '只有 Mac，还没有密钥'
+    mac_only: '只有 Mac，还没有密钥',
+    mac_advanced: 'Mac 高级一键提钥'
   };
 
   let path = null;
@@ -82,6 +86,16 @@
         { id: 'k3', title: '验证并继续', html: verifyHtml() }
       ];
     }
+    if (path === 'mac_advanced') {
+      return [
+        { id: 'a1', title: '先看清前提', html: advancedOverviewHtml() },
+        { id: 'a2', title: '准备 helper', html: advancedHelperHtml() },
+        { id: 'a3', title: '临时关闭 SIP', html: advancedSipHtml() },
+        { id: 'a4', title: '微信停在登录页', html: advancedWechatHtml() },
+        { id: 'a5', title: '执行一键提取', html: advancedRunHtml() },
+        { id: 'a6', title: '排查与收尾', html: advancedTroubleshootHtml() }
+      ];
+    }
     return [
       { id: 'm1', title: '先认清限制', html: macOnlyTruthHtml() },
       { id: 'm2', title: '密钥从哪弄', html: macOnlySourcesHtml() },
@@ -101,7 +115,10 @@
       + choiceBtn('have_backup', '我已经有「解密后的备份目录」', '例如别人拷来的 backup，或本工具以前备份过的文件夹')
       + choiceBtn('have_keys', '我手里已有密钥文本 / 扫描日志', '64 位十六进制，或含 [Cipher-FOUND] 的整段日志')
       + choiceBtn('mac_only', '我只有这台 Mac，还不知道密钥在哪', '最常见；下面会说清楚从哪弄、怎么贴')
-      + '</div>';
+      + choiceBtn('mac_advanced', '我想用「高级模式」一键提钥', '需自备 helper、临时关 SIP、管理员授权；下面 6 步带你走完')
+      + '</div>'
+      + '<p class="mac-keys-warn">高级模式会调整系统安全设置；不想动系统设置请选前三条路线，'
+      + '用「手动输入密钥」或已解密备份即可。</p>';
   }
 
   function choiceBtn(id, title, hint) {
@@ -210,6 +227,105 @@
       + '<p class="mac-keys-warn">不要：在聊天群要别人的密钥、上传含密钥的配置、把打码演示图当真实密钥用。</p>';
   }
 
+  function advancedOverviewHtml() {
+    return ''
+      + '<div class="flow-callout-title">高级模式会动系统设置，先确认你愿意</div>'
+      + '<p>这条路线参考 TraceMemo 的 helper 链路，能在 Mac 上<b>一键取得数据库密钥</b>，'
+      + '但代价是临时关闭 macOS 的 SIP 并完成管理员授权。'
+      + '不方便调整系统设置的话，请回到上一步改选手动路线。</p>'
+      + '<div class="mac-keys-formats"><div><b>五个前提，缺一不可</b></div><ul>'
+      + '<li>Apple Silicon 用 arm64 版程序；Apple 芯片上跑 x86_64 会被直接拦下</li>'
+      + '<li>自备 <code>xkey_helper</code> 系列二进制（本项目<b>不捆绑、不下载</b>）</li>'
+      + '<li>临时关闭 SIP，并在拿到密钥后重新开启</li>'
+      + '<li>微信版本在适配范围内，且退出账号停在登录页</li>'
+      + '<li>终端 / 本程序已获得「完全磁盘访问权限」</li>'
+      + '</ul></div>'
+      + '<p class="mac-keys-note">helper 来自无 LICENSE / NOTICE、无源码的第三方仓库，'
+      + '只供本机使用，存放目录已被 gitignore 排除，请勿随安装包再分发。</p>'
+      + '<p class="mac-keys-warn">失败后不要连续重试，以免触发微信安全模式或系统内存保护。</p>';
+  }
+
+  function advancedHelperHtml() {
+    return ''
+      + '<div class="flow-callout-title">第 1 步：把 helper 放到 resources/mac/</div>'
+      + '<p>不需要安装 TraceMemo.app：参考仓库的 <code>resources/</code> 目录就是随包分发的原始文件。'
+      + '在仓库根执行：</p>'
+      + '<pre class="mac-keys-pre">./scripts/prepare_mac_key_helper.sh /path/to/TraceMemo/resources</pre>'
+      + '<ol class="mac-keys-ol">'
+      + '<li>脚本接受 <b>resources 目录 / .app / git clone 根目录</b> 三种来源。</li>'
+      + '<li>会校验 SHA-256、复制到 <code>resources/mac/</code>、<code>chmod 755</code>，'
+      + '并逐个架构做 ad-hoc 签名与严格校验。</li>'
+      + '<li>用下面的命令确认状态显示 <b>高级模式就绪：是</b>：</li>'
+      + '</ol>'
+      + '<pre class="mac-keys-pre">PYTHONPATH=src .venv/bin/python -m engine.services.mac_key</pre>'
+      + '<p class="mac-keys-note">若显示 <code>HELPER_NOT_FOUND</code>，说明源目录不对或文件没放进去；'
+      + '诊断里也能看到架构流程、SIP 状态和微信版本。</p>';
+  }
+
+  function advancedSipHtml() {
+    return ''
+      + '<div class="flow-callout-title">第 2 步：临时关闭 SIP（完成后务必重开）</div>'
+      + '<ol class="mac-keys-ol">'
+      + '<li>关机后进入恢复模式：Apple 芯片<b>长按开机键</b>；Intel Mac 开机时按 <code>Command + R</code>。</li>'
+      + '<li>在恢复模式的「终端」里执行 <code>csrutil disable</code>，然后重启。</li>'
+      + '<li>回到系统后执行 <code>csrutil status</code>，必须显示 <code>disabled.</code>。</li>'
+      + '<li><b>拿到密钥后</b>再进恢复模式执行 <code>csrutil enable</code> 重新开启。</li>'
+      + '</ol>'
+      + '<p class="mac-keys-warn">关闭 SIP 会降低系统防护，不要长期保持；'
+      + 'macOS 大版本更新会把 SIP 重置回开启，届时需重新处理。</p>'
+      + '<p class="mac-keys-note">SIP 开启时点「一键提取」会立刻返回 <code>SIP_ENABLED</code>，'
+      + '不会白等、也不会弹出授权框。</p>';
+  }
+
+  function advancedWechatHtml() {
+    return ''
+      + '<div class="flow-callout-title">第 3 步：微信版本与登录页</div>'
+      + '<ol class="mac-keys-ol">'
+      + '<li>参考实现已适配微信 <b>4.1.13.8</b>，备选 <b>4.1.8.100</b>；'
+      + '其它版本（含 4.2.0，其 profile 仍是 reserved）大概率 <code>SCAN_FAILED</code>。</li>'
+      + '<li><b>退出当前账号</b>，让微信停在未登录界面——只关闭窗口不算。</li>'
+      + '<li>系统设置 → 隐私与安全性 → <b>完全磁盘访问权限</b>，允许终端 / Python / 本程序，'
+      + '否则读不到 <code>db_storage</code> 做校验。</li>'
+      + '</ol>'
+      + '<p class="mac-keys-note">保持微信进程在运行（停在登录页即可），helper 需要找到它的 PID。</p>';
+  }
+
+  function advancedRunHtml() {
+    return ''
+      + '<div class="flow-callout-title">第 4 步：点「一键提取密钥（高级）」</div>'
+      + '<ol class="mac-keys-ol">'
+      + '<li>打开 <a href="/keyscan">提取密钥</a> 页，确认出现「macOS 高级模式」区块；'
+      + '首次向导里的「Mac 高级提钥」也指向这里。</li>'
+      + '<li>点 <b>一键提取密钥（高级）</b>，系统会弹出<b>管理员授权</b>框，输入密码确认。</li>'
+      + '<li>页面提示出现后，<b>回到微信点「登录」</b>；已有登录凭据时通常不需要扫码。</li>'
+      + '<li>等待进度结束。成功后密钥写入本机配置，随后即可去一键备份。</li>'
+      + '</ol>'
+      + '<p class="mac-keys-note">候选密钥一律先通过数据库首页 HMAC 校验才会写进配置，'
+      + '错误密钥不会污染备份；日志只显示脱敏后的密钥。</p>'
+      + '<p class="mac-keys-warn">监听最长约两分钟；期间不要反复点击或连续重试。</p>';
+  }
+
+  function advancedTroubleshootHtml() {
+    return ''
+      + '<div class="flow-callout-title">第 5 步：失败排查与收尾</div>'
+      + '<div class="mac-keys-formats"><div><b>按错误码处理</b></div><ul>'
+      + '<li><code>SIP_ENABLED</code>：SIP 仍开启，回到第 2 步</li>'
+      + '<li><code>ARCH_MISMATCH_X64_ON_ARM</code>：换 arm64 版程序</li>'
+      + '<li><code>WECHAT_NOT_RUNNING</code>：启动微信并停在登录页</li>'
+      + '<li><code>CAPTURE_TIMEOUT</code>：登录时机不对，退出账号重来</li>'
+      + '<li><code>SCAN_FAILED</code>：版本未适配，降级微信后冷启动再试</li>'
+      + '<li><code>AUTH_CANCELLED / AUTH_TIMEOUT</code>：取消或未及时完成系统授权</li>'
+      + '<li><code>HELPER_NOT_FOUND / HELPER_EXEC_FAILED</code>：helper 没放好或没签名</li>'
+      + '<li><code>NO_VERIFIED_KEY</code>：密钥逐库 HMAC 全不通过，可能需要主密钥派生层</li>'
+      + '</ul></div>'
+      + '<ol class="mac-keys-ol">'
+      + '<li>成功后<b>重新开启 SIP</b>（恢复模式 <code>csrutil enable</code>）。</li>'
+      + '<li>到 <a href="/backup">一键备份</a> 生成可浏览的本地备份，之后日常只碰本地文件。</li>'
+      + '</ol>'
+      + '<p class="mac-keys-note">完整失败码表与命令见 <code>docs/mac-auto-key.md</code>；'
+      + '不想继续折腾可随时回到「手动输入密钥」路线。</p>';
+  }
+
   function renderProgress(list) {
     progress.innerHTML = '';
     list.forEach(function (s, i) {
@@ -241,6 +357,7 @@
     btnNext.textContent = path ? '下一步' : '请先选择上方情况';
     btnNext.disabled = !path;
     goKeys.hidden = !(path === 'have_keys' || path === 'mac_only');
+    goKeyscan.hidden = !(path === 'mac_advanced' && last);
     goBackup.hidden = !(path === 'have_backup' || last);
 
     panel.querySelectorAll('[data-path]').forEach(function (btn) {

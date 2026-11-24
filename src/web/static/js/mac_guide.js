@@ -28,7 +28,7 @@
         + '完成后重新开启 SIP。默认路线不要 chmod 整个微信目录、不要装注入类插件、不要反复附着进程。</li>';
       html += '</ol>';
       html += '<p style="margin:10px 0 0;line-height:1.7;font-size:12px;color:var(--px-muted)">';
-      html += '不知道密钥从哪来？先看 <a href="/mac-keys-guide" style="color:inherit"><b>Mac 密钥新手指引</b></a>。';
+      html += '不知道密钥从哪来 / 想用高级提钥？先看 <a href="/mac-keys-guide" style="color:inherit"><b>Mac 使用新手指引（四条路线）</b></a>。';
       html += '路径示例：<code>~/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/&lt;账号&gt;/db_storage</code>';
       html += '</p>';
     } else {
@@ -39,7 +39,7 @@
     html += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">';
     const path = (window.location && window.location.pathname) || '';
     if (path.indexOf('/mac-keys-guide') !== 0) {
-      html += '<a class="btn btn-primary" style="text-decoration:none;font-size:11px" href="/mac-keys-guide">Mac 密钥指引</a>';
+      html += '<a class="btn btn-primary" style="text-decoration:none;font-size:11px" href="/mac-keys-guide">Mac 使用新手指引</a>';
     }
     if (path.indexOf('/keys') !== 0) {
       html += '<a class="btn btn-secondary" style="text-decoration:none;font-size:11px" href="/keys">手动输入密钥</a>';

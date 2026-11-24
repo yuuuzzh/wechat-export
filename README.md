@@ -1,7 +1,7 @@
 ﻿# WeChat Export · 微信导出
 
 > **维护者**：yuuu · **仓库**：https://github.com/yuuuzzh/wechat-export  
-> **版本**：2.16.20261124（正式版 `v0.6.0`）· **平台**：Windows 10/11（完整）· macOS（分析导出 + 高级提钥）/ Linux（分析导出）· **微信**：4.x（已测 4.1.9 / 4.1.10 / 4.1.12.55 / 4.1.15.11；Mac 高级模式适配 4.1.13.8 / 4.1.8.100）  
+> **版本**：2.16.20261124（正式版 `v0.6.1`）· **平台**：Windows 10/11（完整）· macOS（分析导出 + 高级提钥）/ Linux（分析导出）· **微信**：4.x（已测 4.1.9 / 4.1.10 / 4.1.12.55 / 4.1.15.11；Mac 高级模式适配 4.1.13.8 / 4.1.8.100）  
 > **定位**：本地完成微信聊天记录的**分析、搜索与多格式导出**（备份是前置步骤）
 
 数据默认不出本机 · 可执行文件名 `wechat_exp.exe`（兼容分享包与旧脚本）。界面主题可切换（像素风 / 青春风 / 科技风 / 动漫风 / 微信原始风 / QQ 复古风等，持续完善）。
@@ -488,14 +488,15 @@ python src/main.py voice-export --chat 家族群 --merge-by person --format mp3
 
 - **源码**：https://github.com/yuuuzzh/wechat-export  
 - **维护者**：yuuu  
-- **最新正式 Release**：https://github.com/yuuuzzh/wechat-export/releases/tag/v0.6.0  
+- **最新正式 Release**：https://github.com/yuuuzzh/wechat-export/releases/tag/v0.6.1  
 - **Windows 可执行文件**：用本机 `quick_build.bat` / `build.bat` 打包，或见 Release 附件（若已上传）
 
 下载 exe 后双击即可；也可本地执行 `quick_build.bat` / `build.bat` 自行打包。分享包目录：`share_package/`（模板与说明）。macOS / Linux 请用源码：`python src/main.py`（详见 `docs/platform.md`）。
 
-### 8.1 `v0.6.0`（2026-11-24）
+### 8.1 `v0.6.1`（2026-11-24）
 
 相对 `v0.5.0` 的主要变化：**macOS 高级一键提钥**（参考 TraceMemo 的调用契约）。
+`v0.6.0` 于同日稍早发布；`v0.6.1` 在其基础上补齐 **Mac 使用新手指引**（见下表最后一行），内部版本号仍为 `2.16`。
 
 | 方向 | 内容 |
 |------|------|
@@ -503,7 +504,8 @@ python src/main.py voice-export --chat 家族群 --merge-by person --format mp3
 | 密钥准入 | helper 返回的候选一律先过数据库首页 HMAC 才写配置；账号级密钥逐库试解，日志只输出脱敏密钥 |
 | 向导与 API | `/api/backup/mac-keyscan` SSE；首次向导 / 仪表盘 / 提取密钥页按 helper 就绪状态显示高级入口 |
 | 平台隔离 | macOS 独立策略链，`auto_key_extract_supported()` 保持 Windows-only，Windows 提钥链路零改动 |
-| 工具与指引 | `prepare_mac_key_helper.sh`（放置 + ad-hoc 签名 + 逐架构校验）、只读诊断 CLI、`docs/mac-auto-key.md`、Mac 密钥新手指引 |
+| 工具与指引 | `prepare_mac_key_helper.sh`（放置 + ad-hoc 签名 + 逐架构校验）、只读诊断 CLI、`docs/mac-auto-key.md` |
+| **Mac 使用新手指引**（v0.6.1 补齐） | 应用内 `/mac-keys-guide` 四条路线分步：已有备份 / 已有密钥 / 只有 Mac / 高级一键提钥（6 步：前提 → helper → SIP → 登录页 → 执行 → 排查收尾）；离线版 `docs/mac-keys-guide.html` 同步 |
 | 测试 | 新增 39 个用例覆盖输出契约、失败码、osascript 构造、HMAC 裁决与 UI 接线 |
 
 > helper 二进制不随本项目分发：TraceMemo 仓库无 LICENSE / NOTICE 且无源码，需用户自行放到已被 gitignore 的 `resources/mac/`。高级模式需临时关闭 SIP 并完成管理员授权，详情见 `docs/mac-auto-key.md`。
@@ -516,4 +518,4 @@ python src/main.py voice-export --chat 家族群 --merge-by person --format mp3
 
 ---
 
-**最后更新**：2026-11-24 · WeChat Export by yuuu · 最新正式 tag `v0.6.0`
+**最后更新**：2026-11-24 · WeChat Export by yuuu · 最新正式 tag `v0.6.1`
