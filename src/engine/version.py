@@ -11,7 +11,7 @@ import subprocess as _subprocess
 from datetime import date as _date, datetime as _datetime, timezone as _timezone
 
 MAJOR = 2
-MINOR = 15
+MINOR = 16
 
 
 def _get_build_date() -> str:

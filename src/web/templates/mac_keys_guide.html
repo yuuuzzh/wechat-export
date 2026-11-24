@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+{% block title %}Mac 手动密钥新手指引 — WeChat Export{% endblock %}
+{% block content %}
+<a href="/" class="back-link">← 返回仪表盘</a>
+<p class="onboard-kicker">macOS · 新手指引</p>
+<h2 class="page-title" style="margin-top:0">Mac 上密钥从哪来？怎么输入？</h2>
+<p class="page-desc">
+  本工具在 Mac <strong>默认不能一键从微信进程提取密钥</strong>；自备 helper 的「高级模式」见页面下方说明。
+  下面按你的实际情况选路，一步一步走到「粘贴 → 验证 → 备份」。
+</p>
+
+<div class="mac-keys-progress" id="mac-keys-progress" aria-label="指引进度"></div>
+
+<article class="config-panel mac-keys-panel" id="mac-keys-panel" aria-live="polite"></article>
+
+<div class="form-row" style="margin-top:14px;gap:10px;flex-wrap:wrap">
+  <button type="button" class="btn" id="mac-keys-prev" hidden>上一步</button>
+  <button type="button" class="btn btn-primary" id="mac-keys-next">下一步</button>
+  <a class="btn" href="/keys" id="mac-keys-go-keys" hidden>打开「手动输入密钥」</a>
+  <a class="btn" href="/backup" id="mac-keys-go-backup" hidden>去备份</a>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const panel = document.getElementById('mac-keys-panel');
+  const progress = document.getElementById('mac-keys-progress');
+  const btnPrev = document.getElementById('mac-keys-prev');
+  const btnNext = document.getElementById('mac-keys-next');
+  const goKeys = document.getElementById('mac-keys-go-keys');
+  const goBackup = document.getElementById('mac-keys-go-backup');
+
+  const PATH_LABEL = {
+    have_backup: '已有解密备份',
+    have_keys: '已有密钥 / 扫描日志',
+    mac_only: '只有 Mac，还没有密钥'
+  };
+
+  let path = null;
+  let step = 0;
+
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+
+  function copyExample(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        alert('已复制到剪贴板');
+      }).catch(function () {
+        prompt('请手动复制：', text);
+      });
+    } else {
+      prompt('请手动复制：', text);
+    }
+  }
+
+  function sampleLine() {
+    return 'message_0.db = 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+  }
+
+  function stepsForPath() {
+    if (!path) {
+      return [{
+        id: 'choose',
+        title: '先选你的情况',
+        html: chooseHtml()
+      }];
+    }
+    if (path === 'have_backup') {
+      return [
+        { id: 'b1', title: '直接打开备份', html: backupHtml() },
+        { id: 'b2', title: '确认能浏览', html: doneBrowseHtml() }
+      ];
+    }
+    if (path === 'have_keys') {
+      return [
+        { id: 'k1', title: '准备数据目录', html: dbDirHtml() },
+        { id: 'k2', title: '粘贴密钥', html: pasteHtml() },
+        { id: 'k3', title: '验证并继续', html: verifyHtml() }
+      ];
+    }
+    return [
+      { id: 'm1', title: '先认清限制', html: macOnlyTruthHtml() },
+      { id: 'm2', title: '密钥从哪弄', html: macOnlySourcesHtml() },
+      { id: 'm3', title: '弄到后怎么输入', html: pasteHtml() },
+      { id: 'm4', title: '验证并继续', html: verifyHtml() }
+    ];
+  }
+
+  function chooseHtml() {
+    return ''
+      + '<div class="flow-callout-title">常见卡点</div>'
+      + '<p>很多人在 Mac 上点「提取密钥」等很久——默认那套是 <b>Windows 专用</b>能力。'
+      + 'Mac 版默认需要你自己准备密钥（或已解密备份）再粘贴；'
+      + '若已按 docs/mac-auto-key.md 配好 helper，也可以用「高级模式」一键提取。</p>'
+      + '<p style="margin-bottom:10px">请选最接近的一项：</p>'
+      + '<div class="mac-keys-choices">'
+      + choiceBtn('have_backup', '我已经有「解密后的备份目录」', '例如别人拷来的 backup，或本工具以前备份过的文件夹')
+      + choiceBtn('have_keys', '我手里已有密钥文本 / 扫描日志', '64 位十六进制，或含 [Cipher-FOUND] 的整段日志')
+      + choiceBtn('mac_only', '我只有这台 Mac，还不知道密钥在哪', '最常见；下面会说清楚从哪弄、怎么贴')
+      + '</div>';
+  }
+
+  function choiceBtn(id, title, hint) {
+    return '<button type="button" class="mac-keys-choice" data-path="' + id + '">'
+      + '<strong>' + esc(title) + '</strong>'
+      + '<span>' + esc(hint) + '</span></button>';
+  }
+
+  function backupHtml() {
+    return ''
+      + '<div class="flow-callout-title">有解密备份 → 不用找密钥</div>'
+      + '<ol class="mac-keys-ol">'
+      + '<li>打开仪表盘或备份相关入口，选择 / 指定该备份目录。</li>'
+      + '<li>或源码启动：<code>python3 src/main.py serve --decrypted-dir "/path/to/backup"</code></li>'
+      + '<li>能打开聊天查看器，就说明这套数据已可用，<b>不必再输入密钥</b>。</li>'
+      + '</ol>'
+      + '<p class="mac-keys-note">密钥只在「从微信加密库首次解密」时需要。已解密的库可以直接分析导出。</p>';
+  }
+
+  function doneBrowseHtml() {
+    return ''
+      + '<div class="flow-callout-title">接下来</div>'
+      + '<p>去聊天查看器确认会话列表；正常后即可搜索 / 导出。</p>'
+      + '<p class="mac-keys-note">若提示缺密钥或打不开库，说明这个目录还不是「已解密备份」，请改选「已有密钥」或「只有 Mac」路线。</p>';
+  }
+
+  function dbDirHtml() {
+    return ''
+      + '<div class="flow-callout-title">先指定微信数据目录（db_storage）</div>'
+      + '<p>密钥要和某个账号的数据库配对。Mac 上路径通常类似：</p>'
+      + '<pre class="mac-keys-pre">~/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/&lt;账号&gt;/db_storage</pre>'
+      + '<ol class="mac-keys-ol">'
+      + '<li>系统设置 → 隐私与安全性 → <b>完全磁盘访问权限</b>，允许本程序 / Terminal / Python。</li>'
+      + '<li>打开 <a href="/keys">手动输入密钥</a>，点「刷新」或「深度搜索」选中目录。</li>'
+      + '<li>找不到时：在访达「前往 → 前往文件夹」粘贴上面路径前缀，进入账号目录，把 <code>db_storage</code> 完整路径填进页面。</li>'
+      + '</ol>'
+      + '<p class="mac-keys-note">也可以在微信里找数据目录（若版本提供「文件管理 / 打开文件夹」），再定位到 <code>db_storage</code>。</p>';
+  }
+
+  function pasteHtml() {
+    const sample = sampleLine();
+    return ''
+      + '<div class="flow-callout-title">在「手动输入密钥」里粘贴</div>'
+      + '<ol class="mac-keys-ol">'
+      + '<li>打开 <a href="/keys">/keys 手动输入密钥</a>。</li>'
+      + '<li>确认上方已选对 <code>db_storage</code>。</li>'
+      + '<li>把密钥贴进大文本框（或选择 .txt / .log 文件）。</li>'
+      + '<li>点 <b>验证并保存</b>。通过后会出现「已就绪」的数据库行。</li>'
+      + '</ol>'
+      + '<p><b>推荐写法</b>（一行一条）：</p>'
+      + '<pre class="mac-keys-pre" id="mac-keys-sample">' + esc(sample) + '</pre>'
+      + '<button type="button" class="btn btn-secondary mac-keys-copy" data-copy="' + esc(sample) + '">复制示例格式</button>'
+      + '<div class="mac-keys-formats">'
+      + '<div><b>也支持</b></div>'
+      + '<ul>'
+      + '<li>只贴 64 位十六进制密钥（程序自动试配哪个库）</li>'
+      + '<li>整段 Windows「提取密钥」日志（含 <code>[Cipher-FOUND] …</code>）</li>'
+      + '<li><code>x\'&lt;64位key&gt;&lt;32位salt&gt;\'</code> 微信原始形式</li>'
+      + '</ul></div>'
+      + '<p class="mac-keys-warn">打码 / 带 <code>*</code> / <code>…</code> 的密钥不能用。截图里遮住的也无效——需要完整 64 位。</p>';
+  }
+
+  function verifyHtml() {
+    return ''
+      + '<div class="flow-callout-title">验证成功后</div>'
+      + '<ol class="mac-keys-ol">'
+      + '<li>到 <a href="/backup">一键备份</a> 做一次备份（首次可勾选全部记录）。</li>'
+      + '<li>再到聊天查看器确认能打开会话。</li>'
+      + '<li>之后日常分析 / 导出尽量用本地备份，不必反复碰密钥。</li>'
+      + '</ol>'
+      + '<p class="mac-keys-note">密钥保存在本机配置（如 Application Support 下的配置文件），请勿上传到公开网盘或发到群里。</p>'
+      + '<p class="mac-keys-warn">若校验失败：检查是否选错账号目录、密钥是否完整、是否多账号互相粘错。</p>';
+  }
+
+  function macOnlyTruthHtml() {
+    return ''
+      + '<div class="flow-callout-title">重要：默认路线不会在 Mac「搜出」密钥</div>'
+      + '<p>Windows 上的「提取密钥」会读微信进程内存。Mac 默认<strong>不做</strong>进程附加；'
+      + '高级模式（参考 TraceMemo）需自备 helper、临时关闭 SIP、管理员授权，并让微信停在登录页。</p>'
+      + '<p>所以默认路线要找的不是本软件里的某个隐藏按钮，而是：</p>'
+      + '<ul class="mac-keys-ol">'
+      + '<li>从<strong>别的地方拿到</strong> 64 位密钥文本；或</li>'
+      + '<li>拿到一份<strong>已经解密</strong>的备份目录；或</li>'
+      + '<li>按 <code>docs/mac-auto-key.md</code> 配置高级模式后一键提取。</li>'
+      + '</ul>'
+      + '<p class="mac-keys-note">默认推荐「低风险：密钥准备一次，之后只碰本地文件」；'
+      + '高级模式会调整系统安全设置，拿到密钥后请重新开启 SIP。</p>';
+  }
+
+  function macOnlySourcesHtml() {
+    return ''
+      + '<div class="flow-callout-title">密钥可以从哪里来？（按推荐顺序）</div>'
+      + '<ol class="mac-keys-ol">'
+      + '<li><b>有一台 Windows 电脑（最省事）</b><br>'
+      + '在 Windows 安装同账号微信 → 用本工具「提取密钥」→ 把完整日志或密钥文本拷到 Mac → 粘贴到「手动输入密钥」。'
+      + '只需做一次。</li>'
+      + '<li><b>别人 / 以前已经导出过密钥文件</b><br>'
+      + '找 <code>keys.txt</code>、<code>keyscan.log</code>、或配置里保存过的密钥清单（完整、未打码）。</li>'
+      + '<li><b>已有解密备份</b><br>'
+      + '直接当「已有解密备份」路线用，跳过密钥。</li>'
+      + '<li><b>Mac helper（高级模式）</b><br>'
+      + '本项目参考 TraceMemo 实现了 helper 调用契约，但<strong>不捆绑第三方二进制</strong>：'
+      + '需自行把 xkey_helper 放到 <code>resources/mac/</code>，并临时关闭 SIP + 完成管理员授权。'
+      + '步骤见 docs/mac-auto-key.md；若用其他工具取出密钥，只要得到完整 64 位 hex，仍可粘贴回「手动输入密钥」。</li>'
+      + '</ol>'
+      + '<p class="mac-keys-warn">不要：在聊天群要别人的密钥、上传含密钥的配置、把打码演示图当真实密钥用。</p>';
+  }
+
+  function renderProgress(list) {
+    progress.innerHTML = '';
+    list.forEach(function (s, i) {
+      const chip = document.createElement('span');
+      chip.className = 'mac-keys-chip' + (i === step ? ' is-current' : '') + (i < step ? ' is-done' : '');
+      chip.textContent = (i + 1) + '. ' + s.title;
+      progress.appendChild(chip);
+      if (i < list.length - 1) {
+        const arrow = document.createElement('span');
+        arrow.className = 'mac-keys-chip-arrow';
+        arrow.textContent = '→';
+        progress.appendChild(arrow);
+      }
+    });
+  }
+
+  function render() {
+    const list = stepsForPath();
+    if (step >= list.length) step = list.length - 1;
+    if (step < 0) step = 0;
+    const cur = list[step];
+    panel.innerHTML = cur.html;
+    renderProgress(list);
+
+    btnPrev.hidden = step === 0 && !path;
+    btnPrev.textContent = (step === 0 && path) ? '重选情况' : '上一步';
+    const last = step >= list.length - 1;
+    btnNext.hidden = last && !!path;
+    btnNext.textContent = path ? '下一步' : '请先选择上方情况';
+    btnNext.disabled = !path;
+    goKeys.hidden = !(path === 'have_keys' || path === 'mac_only');
+    goBackup.hidden = !(path === 'have_backup' || last);
+
+    panel.querySelectorAll('[data-path]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        path = btn.getAttribute('data-path');
+        step = 0;
+        render();
+      });
+    });
+    panel.querySelectorAll('.mac-keys-copy').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        copyExample(btn.getAttribute('data-copy') || sampleLine());
+      });
+    });
+  }
+
+  btnPrev.addEventListener('click', function () {
+    if (step === 0 && path) {
+      path = null;
+      step = 0;
+    } else {
+      step -= 1;
+    }
+    render();
+  });
+  btnNext.addEventListener('click', function () {
+    if (!path) return;
+    step += 1;
+    render();
+  });
+
+  render();
+})();
+</script>
+{% endblock %}

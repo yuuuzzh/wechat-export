@@ -403,6 +403,11 @@ def create_app(decrypted_dir: str, wxid: str = None, db_dir: str = None) -> Flas
     def manual_keys_page():
         return render_template('keys.html')
 
+    @app.route('/mac-keys-guide')
+    def mac_keys_guide_page():
+        """Interactive newbie guide: where Mac keys come from and how to paste them."""
+        return render_template('mac_keys_guide.html')
+
     @app.route('/settings')
     def settings_page():
         return render_template('settings.html')

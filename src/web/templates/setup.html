@@ -27,7 +27,8 @@
 
 <div id="setup-manual-links" class="form-row onboard-manual-links" style="gap:12px;flex-wrap:wrap">
   <a class="btn" href="/backup">打开备份页</a>
-  <a class="btn" href="/keyscan">打开提钥页</a>
+  <a class="btn" id="setup-link-keys" href="/keyscan">打开提钥页</a>
+  <a class="btn" id="setup-link-mac-guide" href="/mac-keys-guide" hidden>Mac 密钥指引</a>
 </div>
 
 <div id="setup-next-bar" class="onboard-next-bar" hidden>
@@ -53,6 +54,20 @@
     backup: { href: '/backup', label: '开始备份' },
     viewer: { href: '/chat', label: '打开查看器' }
   };
+  const linkKeys = document.getElementById('setup-link-keys');
+  const linkMac = document.getElementById('setup-link-mac-guide');
+
+  function applyMacKeysMode(enabled, advanced) {
+    if (!enabled) return;
+    actions.keys = advanced
+      ? { href: '/keyscan', label: 'Mac 高级提钥' }
+      : { href: '/mac-keys-guide', label: 'Mac 密钥指引' };
+    if (linkKeys) {
+      linkKeys.href = '/keys';
+      linkKeys.textContent = '手动输入密钥';
+    }
+    if (linkMac) linkMac.hidden = false;
+  }
 
   function renderStep(step, index, nextStep) {
     const li = document.createElement('li');
@@ -92,12 +107,22 @@
       const response = await fetch('/api/setup/status');
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error('status failed');
+      applyMacKeysMode(Boolean(data.mac_keys_guide), Boolean(data.mac_keys_advanced));
 
       wechatStatus.textContent = data.wechat_running ? '已检测到微信正在运行' : '暂未检测到微信运行';
       wechatStatus.classList.toggle('is-running', Boolean(data.wechat_running));
-      summary.textContent = data.wechat_running
-        ? '可以继续检测目录或提取密钥。'
-        : '提取密钥前，请先启动并登录微信；其他步骤仍可查看。';
+      if (data.mac_keys_advanced) {
+        summary.textContent = 'Mac 高级模式可用：需临时关闭 SIP、管理员授权，并让微信停在登录页；'
+          + '也可继续用手动密钥或已解密备份。';
+      } else if (data.mac_keys_guide) {
+        summary.textContent = data.wechat_running
+          ? 'Mac 请走密钥指引 / 手动粘贴；也可直接打开已解密备份。'
+          : 'Mac 无自动提钥；可先看密钥指引，或准备已解密备份。';
+      } else {
+        summary.textContent = data.wechat_running
+          ? '可以继续检测目录或提取密钥。'
+          : '提取密钥前，请先启动并登录微信；其他步骤仍可查看。';
+      }
 
       stepsEl.replaceChildren();
       (data.steps || []).forEach((step, index) => {

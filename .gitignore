@@ -41,3 +41,6 @@ Thumbs.db
 file_version.txt
 *.log
 *.tmp
+
+# Third-party macOS key helpers: user-supplied binaries, never redistributed
+/resources/mac/

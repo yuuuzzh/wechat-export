@@ -2225,6 +2225,54 @@ body:has(#cleanup-app) #content { max-width: none; padding: 0; margin: 0; }
 .inline-error[hidden] { display: none; }
 .console-tip p { margin: 0 0 10px; line-height: 1.7; }
 
+/* Mac keys newbie guide */
+.mac-keys-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 0 0 14px;
+}
+.mac-keys-chip {
+  font-size: 12px;
+  color: var(--px-muted);
+  border: 1px solid var(--px-border);
+  padding: 4px 8px;
+  background: color-mix(in srgb, var(--px-panel-2) 70%, transparent);
+}
+.mac-keys-chip.is-current { color: var(--px-gold); border-color: var(--px-gold); }
+.mac-keys-chip.is-done { color: var(--px-ok); }
+.mac-keys-chip-arrow { color: var(--px-border); font-size: 12px; }
+.mac-keys-panel .flow-callout-title { margin-bottom: 8px; }
+.mac-keys-choices { display: flex; flex-direction: column; gap: 10px; }
+.mac-keys-choice {
+  display: block;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  background: var(--px-bg);
+  color: var(--px-text);
+  border: 1px solid var(--px-border);
+  padding: 12px 14px;
+  font: inherit;
+}
+.mac-keys-choice:hover { border-color: var(--px-gold); }
+.mac-keys-choice strong { display: block; margin-bottom: 4px; }
+.mac-keys-choice span { color: var(--px-muted); font-size: 13px; }
+.mac-keys-ol { margin: 0; padding-left: 1.2em; line-height: 1.8; }
+.mac-keys-pre {
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  overflow: auto;
+  background: var(--px-bg);
+  border: 1px solid var(--px-border);
+  color: var(--px-text);
+  font-size: 12px;
+}
+.mac-keys-note { color: var(--px-muted); font-size: 13px; }
+.mac-keys-warn { color: var(--px-warn); font-size: 13px; }
+.mac-keys-formats { margin-top: 12px; font-size: 13px; color: var(--px-muted); }
+
 /* Narrow forms: stack the dense export, settings, and search controls */
 @media (max-width: 720px) {
   body:has(#cfg-chat-q) .config-panel .form-row,

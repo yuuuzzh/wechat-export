@@ -1,4 +1,4 @@
-/* mac_guide.js — Show low-risk Mac workflow tips when auto key extract is unavailable */
+/* mac_guide.js — Show low-risk Mac workflow tips; advanced helper mode is opt-in */
 (function () {
   const DISMISS_KEY = 'wechat-export-mac-guide-dismissed';
 
@@ -15,28 +15,34 @@
     const compact = !!opts.compact;
     let html = '<div class="flow-callout-title">macOS 低风险用法（推荐）</div>';
     html += '<p style="margin:0 0 8px 0;line-height:1.7">';
-    html += '本机<strong>不会</strong>自动挂接微信进程取密钥（不做注入 / Frida / 关 SIP）。';
-    html += '这样比「每次扫描进程」更不容易触发微信环境异常，但<strong>不能保证永不风控</strong>。';
+    html += '默认路线<strong>不会</strong>自动挂接微信进程取密钥；这样比「每次扫描进程」更不容易触发微信环境异常。';
+    html += '高级模式（自备 helper，需临时关 SIP + 管理员授权）见 docs/mac-auto-key.md，';
+    html += '我们<strong>不能保证永不风控</strong>。';
     html += '</p>';
     if (!compact) {
       html += '<ol style="margin:0;padding-left:18px;line-height:1.75">';
       html += '<li><b>密钥只准备一次</b>：用已有密钥粘贴到「手动输入密钥」，或直接打开已解密备份目录。</li>';
       html += '<li><b>日常只碰本地文件</b>：备份 / 导出 / 搜索时尽量不依赖「挂进程取钥」；分析阶段可先退出微信。</li>';
       html += '<li><b>读沙盒目录</b>：系统设置 → 隐私与安全性 → 完全磁盘访问权限，允许 Terminal / Python / 本程序。</li>';
-      html += '<li><b>不要做</b>：关 SIP、chmod 整个微信目录、装发送/注入类插件、反复调试附着微信进程。</li>';
+      html += '<li><b>高级模式才需要</b>：临时关闭 SIP、管理员授权、微信停在登录页；'
+        + '完成后重新开启 SIP。默认路线不要 chmod 整个微信目录、不要装注入类插件、不要反复附着进程。</li>';
       html += '</ol>';
       html += '<p style="margin:10px 0 0;line-height:1.7;font-size:12px;color:var(--px-muted)">';
+      html += '不知道密钥从哪来？先看 <a href="/mac-keys-guide" style="color:inherit"><b>Mac 密钥新手指引</b></a>。';
       html += '路径示例：<code>~/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/&lt;账号&gt;/db_storage</code>';
-      html += ' · 详见 <a href="/docs" style="color:inherit">说明</a> / docs/platform.md';
       html += '</p>';
     } else {
-      html += '<p style="margin:0;line-height:1.7">请先走「手动输入密钥」或打开已解密备份，再备份/导出。';
+      html += '<p style="margin:0;line-height:1.7">Mac <b>默认不能</b>一键提钥（高级模式需自备 helper 与临时关 SIP）。请先看';
+      html += '<a href="/mac-keys-guide">新手指引</a>，再「手动输入密钥」或打开已解密备份。';
       html += '需要完全磁盘访问才能读微信沙盒目录。</p>';
     }
     html += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">';
     const path = (window.location && window.location.pathname) || '';
+    if (path.indexOf('/mac-keys-guide') !== 0) {
+      html += '<a class="btn btn-primary" style="text-decoration:none;font-size:11px" href="/mac-keys-guide">Mac 密钥指引</a>';
+    }
     if (path.indexOf('/keys') !== 0) {
-      html += '<a class="btn btn-primary" style="text-decoration:none;font-size:11px" href="/keys">手动输入密钥</a>';
+      html += '<a class="btn btn-secondary" style="text-decoration:none;font-size:11px" href="/keys">手动输入密钥</a>';
     }
     if (path.indexOf('/backup') !== 0) {
       html += '<a class="btn btn-secondary" style="text-decoration:none;font-size:11px" href="/backup">一键备份</a>';

@@ -80,8 +80,54 @@ def system_name() -> str:
 
 
 def auto_key_extract_supported() -> bool:
-    """Process-memory / Config.Cipher auto extract is Windows-only today."""
+    """Built-in, zero-setup auto extract (Config.Cipher) is Windows-only.
+
+    NOTE: macOS providers live in ``engine.services.mac_key`` and are reported
+    separately by :func:`mac_key_capabilities`. This flag deliberately stays
+    False on macOS so the first-run wizard keeps steering ordinary users to
+    manual keys / decrypted backups until a first-party helper ships.
+    """
     return is_windows()
+
+
+def mac_auto_key_ready(db_dir: str = '') -> bool:
+    """True when a TraceMemo-style helper is installed and can be invoked.
+
+    Intentionally separate from :func:`auto_key_extract_supported`: the latter
+    gates the Win32 ``key_scan`` path in ``backup/pipeline.py`` and must stay
+    Windows-only. UI surfaces use this flag to expose the Mac advanced mode.
+    """
+    return bool(mac_key_capabilities(db_dir).get('auto_extract_ready'))
+
+
+def mac_key_capabilities(db_dir: str = '') -> dict[str, Any]:
+    """Read-only snapshot of the macOS key-source layer.
+
+    Safe to call on every platform; on non-macOS hosts it returns a minimal
+    ``{'enabled': False}`` dict without running any external command.
+    """
+    if not is_macos():
+        return {'enabled': False, 'reason': 'not_macos',
+                'auto_extract_ready': False, 'providers': []}
+    try:
+        from engine.services.mac_key import diagnostics
+        info = diagnostics.collect(db_dir)
+        return {
+            'enabled': True,
+            'auto_extract_ready': bool(info.get('auto_extract_ready')),
+            'capture_ready': bool(info.get('capture_ready')),
+            'mac_key_flow': info.get('mac_key_flow', ''),
+            'sip_enabled': info.get('sip_enabled'),
+            'wechat_running': info.get('wechat_running'),
+            'wechat_version': info.get('wechat_version', ''),
+            'helper_mode': info.get('helper_mode', ''),
+            'helper_inventory': info.get('helper_inventory', {}),
+            'mmkv_layout': info.get('mmkv', {}).get('layout', 'none'),
+            'providers': info.get('providers', []),
+        }
+    except Exception as exc:  # diagnostics must never break /api/health
+        return {'enabled': True, 'auto_extract_ready': False,
+                'error': str(exc)[:160], 'providers': []}
 
 
 def v2_key_harvest_supported() -> bool:
@@ -163,6 +209,7 @@ def capabilities() -> dict[str, Any]:
         'python': platform.python_version(),
         'machine': platform.machine(),
         'auto_key_extract': auto_key_extract_supported(),
+        'mac_key': mac_key_capabilities(),
         'v2_key_harvest': v2_key_harvest_supported(),
         'task_scheduler': task_scheduler_supported(),
         'ffmpeg_zip_install': ffmpeg_install_zip_supported(),
@@ -178,9 +225,9 @@ def _platform_notes() -> list[str]:
     notes = []
     if is_macos():
         notes.append(
-            'macOS：自动提取密钥尚未移植（需原生 helper + 常关闭 SIP）。'
-            '请使用「手动输入密钥」或打开已解密备份；'
-            '访问微信沙盒目录需要「完全磁盘访问权限」。'
+            'macOS：默认走「手动输入密钥」或已解密备份。高级模式参考 TraceMemo，'
+            '需自备 xkey_helper、临时关闭 SIP 并完成管理员授权，'
+            '且微信停在登录页；详见 docs/mac-auto-key.md。'
         )
         notes.append(
             '建议：brew install ffmpeg；语音 SILK 解码需自行编译 tools/silk_decoder。'

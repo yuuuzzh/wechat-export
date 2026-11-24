@@ -263,13 +263,71 @@ def backup_scan():
     return sse_response(gen)
 
 
+def _mac_keyscan_sse(db_dir):
+    """macOS advanced key extraction (TraceMemo-style helper chain) over SSE.
+
+    ``extract_all_keys`` dispatches to ``_extract_all_keys_macos`` on darwin,
+    which never imports a Win32-bound module. Every helper candidate is
+    HMAC-verified before ``save_key_results`` writes anything.
+    """
+    push, gen = create_sse_progress()
+    flask_app = current_app._get_current_object()
+
+    def _run():
+        with flask_app.app_context():
+            try:
+                from engine.db_key_crypto import collect_db_files
+                from engine.services.wechat_key_extract import extract_all_keys
+                from engine.platform_info import mac_key_capabilities
+
+                caps = mac_key_capabilities(db_dir)
+                push('scan', '检查 macOS 高级提钥环境...', 0.05)
+                if not caps.get('auto_extract_ready'):
+                    push.error(
+                        '高级模式未就绪：请把 xkey_helper / xkey_helper_4_1_13 放到 '
+                        'resources/mac/（见 scripts/prepare_mac_key_helper.sh）；'
+                        '当前仍可用「手动输入密钥」或已解密备份。')
+                    return
+                if caps.get('sip_enabled'):
+                    push.error(
+                        'SIP 仍开启。高级模式需在恢复模式临时关闭 SIP 并重启，'
+                        '拿到密钥后请重新开启；详见 docs/mac-auto-key.md。')
+                    return
+
+                db_files, salt_to_dbs = collect_db_files(db_dir)
+                total = len(salt_to_dbs)
+                push('scan', f'找到 {len(db_files)} 个数据库, {total} 个不同密钥', 0.10)
+                push('scan', '请让微信停在登录界面；出现授权提示后完成管理员授权，再点「登录」', 0.12)
+
+                key_map = extract_all_keys(
+                    db_dir,
+                    print_fn=lambda m: push('scan', m, 0.35),
+                    progress_fn=lambda pct, msg: push(
+                        'scan', msg, min(0.95, 0.10 + pct / 100 * 0.82)))
+                push.done({
+                    'keys': len(key_map),
+                    'total': total,
+                    'source': 'mac-helper' if key_map else 'none',
+                    'output': ('高级提钥完成，密钥已写入配置。'
+                               if key_map else
+                               '未取到可用密钥。请查看上方失败码，或改用「手动输入密钥」。'),
+                })
+            except Exception as e:
+                push.error(str(e))
+
+    threading.Thread(target=_run, daemon=True).start()
+    return sse_response(gen)
+
+
 @backup_bp.route('/keyscan', methods=['POST'])
+@backup_bp.route('/mac-keyscan', methods=['POST'])
 def backup_keyscan():
     """POST /api/backup/keyscan — Extract decryption keys.
 
-    Preferred path: read-only Config.Cipher scan (WeChat 4.1.10+, no admin,
-    no restart, no hook). Falls back to key_scan's full strategy chain only
-    when the read-only scan cannot resolve every salt.
+    Windows: read-only Config.Cipher scan (WeChat 4.1.10+, no admin), with
+    ``key_scan``'s full strategy chain as fallback.
+    macOS: dispatches to the TraceMemo-style helper chain (see
+    ``_mac_keyscan_sse``); the Win32 modules are never imported.
     """
     data = request.get_json(silent=True) or {}
     db_dir = data.get('db_dir') or current_app.config.get('DB_DIR')
@@ -290,6 +348,9 @@ def backup_keyscan():
         push, gen = create_sse_progress()
         push.error(f"微信数据目录不存在或不可访问: {db_dir}")
         return sse_response(gen)
+
+    if sys.platform == 'darwin':
+        return _mac_keyscan_sse(db_dir)
 
     push, gen = create_sse_progress()
     flask_app = current_app._get_current_object()

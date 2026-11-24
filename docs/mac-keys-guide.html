@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mac 手动密钥新手指引 — WeChat Export</title>
+  <style>
+    :root {
+      --bg: #0b1410;
+      --panel: #12201a;
+      --border: #2f6b54;
+      --text: #e8f7ee;
+      --muted: #8fb9a6;
+      --gold: #e6c35c;
+      --ok: #3dcea8;
+      --warn: #f0a060;
+      --accent: #4aa3ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+      background: radial-gradient(1200px 600px at 10% -10%, #163528 0%, var(--bg) 55%);
+      color: var(--text);
+      line-height: 1.7;
+      padding: 24px 16px 48px;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; }
+    .kicker { color: var(--gold); font-size: 12px; letter-spacing: 0.04em; margin: 0 0 6px; }
+    h1 { margin: 0 0 8px; font-size: 26px; }
+    .lead { color: var(--muted); margin: 0 0 20px; }
+    .progress { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; }
+    .chip {
+      font-size: 12px; color: var(--muted); border: 1px solid var(--border);
+      padding: 4px 8px; background: rgba(47,107,84,0.15);
+    }
+    .chip.is-current { color: var(--gold); border-color: var(--gold); }
+    .chip.is-done { color: var(--ok); }
+    .arrow { color: var(--border); font-size: 12px; }
+    .panel {
+      background: var(--panel); border: 1px solid var(--border); padding: 18px 16px;
+    }
+    .title { color: var(--gold); font-weight: 700; margin: 0 0 10px; }
+    .choices { display: flex; flex-direction: column; gap: 10px; }
+    .choice {
+      text-align: left; cursor: pointer; background: #0a1612; color: var(--text);
+      border: 1px solid var(--border); padding: 12px 14px;
+    }
+    .choice:hover { border-color: var(--gold); }
+    .choice strong { display: block; margin-bottom: 4px; }
+    .choice span { color: var(--muted); font-size: 13px; }
+    ol, ul { padding-left: 1.2em; }
+    pre {
+      background: #0a1612; border: 1px solid var(--border); padding: 10px 12px;
+      overflow: auto; font-size: 12px; color: #cfeee0;
+    }
+    .note { color: var(--muted); font-size: 13px; }
+    .warn { color: var(--warn); font-size: 13px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    button, .btn {
+      appearance: none; border: 1px solid var(--border); background: #0a1612;
+      color: var(--text); padding: 8px 14px; cursor: pointer; font: inherit; text-decoration: none;
+    }
+    button.primary, .btn.primary { background: #1e5c45; border-color: #3dcea8; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    a { color: var(--accent); }
+    footer { margin-top: 22px; color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <p class="kicker">WeChat Export · 可单独打开的 HTML</p>
+    <h1>Mac 手动密钥新手指引</h1>
+    <p class="lead">本工具在 Mac <b>不能一键从微信进程提取密钥</b>。按你的情况选路，再学怎么粘贴到「手动输入密钥」。</p>
+    <div class="progress" id="progress"></div>
+    <article class="panel" id="panel"></article>
+    <div class="actions">
+      <button type="button" id="prev" hidden>上一步</button>
+      <button type="button" class="primary" id="next">下一步</button>
+    </div>
+    <footer>
+      若已运行本程序，建议打开应用内指引：
+      <code>http://127.0.0.1:5000/mac-keys-guide</code>
+      · 粘贴入口：<code>/keys</code>
+    </footer>
+  </div>
+  <script>
+  (function () {
+    const panel = document.getElementById('panel');
+    const progress = document.getElementById('progress');
+    const btnPrev = document.getElementById('prev');
+    const btnNext = document.getElementById('next');
+    let path = null;
+    let step = 0;
+    const sample = 'message_0.db = 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
+    function choice(id, title, hint) {
+      return '<button type="button" class="choice" data-path="' + id + '"><strong>' + title +
+        '</strong><span>' + hint + '</span></button>';
+    }
+    function choose() {
+      return '<div class="title">先选你的情况</div>'
+        + '<p>Mac 上点「提取密钥」通常没用——那是 Windows 能力。请选最接近的一项：</p>'
+        + '<div class="choices">'
+        + choice('have_backup', '我已经有解密后的备份目录', '可直接浏览，不必再找密钥')
+        + choice('have_keys', '我手里已有密钥文本 / 扫描日志', '64 位 hex 或含 [Cipher-FOUND] 的日志')
+        + choice('mac_only', '我只有这台 Mac，还不知道密钥在哪', '最常见')
+        + '</div>';
+    }
+    function backup() {
+      return '<div class="title">有解密备份 → 不用找密钥</div>'
+        + '<ol><li>用本工具打开该备份目录（或 <code>serve --decrypted-dir</code>）。</li>'
+        + '<li>能进聊天查看器就说明可用。</li></ol>'
+        + '<p class="note">密钥只在首次从微信加密库解密时需要。</p>';
+    }
+    function dbDir() {
+      return '<div class="title">先指定 db_storage</div>'
+        + '<pre>~/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/&lt;账号&gt;/db_storage</pre>'
+        + '<ol><li>系统设置 → 隐私与安全性 → 完全磁盘访问权限，允许本程序 / Terminal。</li>'
+        + '<li>在「手动输入密钥」页刷新 / 深度搜索，或手动粘贴完整路径。</li></ol>';
+    }
+    function paste() {
+      return '<div class="title">粘贴到「手动输入密钥」</div>'
+        + '<ol><li>打开应用内 <code>/keys</code>。</li>'
+        + '<li>确认已选对 db_storage。</li>'
+        + '<li>粘贴密钥后点「验证并保存」。</li></ol>'
+        + '<p><b>推荐格式</b></p><pre>' + sample + '</pre>'
+        + '<p class="warn">打码 / 带 * / … 的密钥无效，需要完整 64 位。</p>';
+    }
+    function verify() {
+      return '<div class="title">验证成功后</div>'
+        + '<ol><li>去做一次一键备份。</li><li>打开聊天查看器确认。</li>'
+        + '<li>之后尽量只用本地备份分析导出。</li></ol>'
+        + '<p class="warn">勿把含密钥的配置上传公开网盘或发到群里。</p>';
+    }
+    function truth() {
+      return '<div class="title">本工具不会在 Mac「搜出」密钥</div>'
+        + '<p>你需要从别处拿到 64 位密钥，或拿到已解密备份。</p>';
+    }
+    function sources() {
+      return '<div class="title">密钥从哪来？</div>'
+        + '<ol>'
+        + '<li><b>Windows 电脑提一次</b>（推荐）：同账号微信 + 本工具「提取密钥」，把完整日志拷到 Mac 粘贴。</li>'
+        + '<li><b>已有 keys.txt / keyscan.log</b>（未打码）。</li>'
+        + '<li><b>已有解密备份</b>：改走备份路线。</li>'
+        + '<li><b>其他 Mac 提钥工具</b>：本项目不捆绑、不引导关 SIP；若你自行取出完整密钥，仍可粘贴回本工具。</li>'
+        + '</ol>';
+    }
+    function list() {
+      if (!path) return [{ title: '选情况', html: choose() }];
+      if (path === 'have_backup') return [
+        { title: '打开备份', html: backup() },
+        { title: '确认', html: '<div class="title">完成</div><p>能浏览即可开始导出 / 搜索。</p>' }
+      ];
+      if (path === 'have_keys') return [
+        { title: '数据目录', html: dbDir() },
+        { title: '粘贴', html: paste() },
+        { title: '验证', html: verify() }
+      ];
+      return [
+        { title: '认清限制', html: truth() },
+        { title: '密钥来源', html: sources() },
+        { title: '粘贴', html: paste() },
+        { title: '验证', html: verify() }
+      ];
+    }
+    function render() {
+      const steps = list();
+      step = Math.max(0, Math.min(step, steps.length - 1));
+      panel.innerHTML = steps[step].html;
+      progress.innerHTML = '';
+      steps.forEach(function (s, i) {
+        const chip = document.createElement('span');
+        chip.className = 'chip' + (i === step ? ' is-current' : '') + (i < step ? ' is-done' : '');
+        chip.textContent = (i + 1) + '. ' + s.title;
+        progress.appendChild(chip);
+        if (i < steps.length - 1) {
+          const a = document.createElement('span');
+          a.className = 'arrow';
+          a.textContent = '→';
+          progress.appendChild(a);
+        }
+      });
+      btnPrev.hidden = step === 0 && !path;
+      btnPrev.textContent = (step === 0 && path) ? '重选情况' : '上一步';
+      btnNext.hidden = !!path && step >= steps.length - 1;
+      btnNext.disabled = !path;
+      panel.querySelectorAll('[data-path]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          path = btn.getAttribute('data-path');
+          step = 0;
+          render();
+        });
+      });
+    }
+    btnPrev.addEventListener('click', function () {
+      if (step === 0 && path) { path = null; step = 0; }
+      else step -= 1;
+      render();
+    });
+    btnNext.addEventListener('click', function () {
+      if (!path) return;
+      step += 1;
+      render();
+    });
+    render();
+  })();
+  </script>
+</body>
+</html>

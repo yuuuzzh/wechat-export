@@ -1,7 +1,7 @@
 ﻿# WeChat Export · 微信导出
 
 > **维护者**：yuuu · **仓库**：https://github.com/yuuuzzh/wechat-export  
-> **版本**：2.15.20261123（正式版 `v0.5.0`）· **平台**：Windows 10/11（完整）· macOS / Linux（分析导出）· **微信**：4.x（已测 4.1.9 / 4.1.10 / 4.1.12.55 / 4.1.15.11）  
+> **版本**：2.16.20261124（正式版 `v0.6.0`）· **平台**：Windows 10/11（完整）· macOS（分析导出 + 高级提钥）/ Linux（分析导出）· **微信**：4.x（已测 4.1.9 / 4.1.10 / 4.1.12.55 / 4.1.15.11；Mac 高级模式适配 4.1.13.8 / 4.1.8.100）  
 > **定位**：本地完成微信聊天记录的**分析、搜索与多格式导出**（备份是前置步骤）
 
 数据默认不出本机 · 可执行文件名 `wechat_exp.exe`（兼容分享包与旧脚本）。界面主题可切换（像素风 / 青春风 / 科技风 / 动漫风 / 微信原始风 / QQ 复古风等，持续完善）。
@@ -122,16 +122,16 @@
 | 项 | 说明 |
 |----|------|
 | 系统 | **Windows 10/11（完整能力）**；**macOS** 可用源码或 `./quick_build_macos.sh` 打出 `.app`/`.dmg`（分析导出；**未公证**）；**Linux** 源码模式 |
-| 微信 | Windows 微信 4.x（上表已测）；macOS 微信 4.x 可读数据目录，但**自动提取密钥尚未移植** |
+| 微信 | Windows 微信 4.x（上表已测）；macOS 微信 4.x 可读数据目录，默认手动密钥；**高级一键提钥**参考 TraceMemo，需自备 helper + 临时关 SIP（见 `docs/mac-auto-key.md`，已适配 4.1.13.8 / 4.1.8.100） |
 | 磁盘 | 约等于微信数据目录大小（常见 2–10 GB） |
 
-### 平台差异（为何 TraceMemo 能跑 Mac，而本项目长期标 Windows）
+### 平台差异
 
 | 能力 | Windows | macOS / Linux |
 |------|---------|---------------|
 | 查看已解密备份 / 导出 / 搜索 / 报告 / 群聊日报 | ✅ | ✅ |
 | 手动粘贴密钥后解密 | ✅ | ✅ |
-| 自动从进程提取 DB 密钥 | ✅ | ❌（需原生 helper，类似 TraceMemo 的 `xkey_helper`） |
+| 自动从进程提取 DB 密钥 | ✅ | macOS：⚠️ 高级模式（自备 `xkey_helper`、临时关 SIP、管理员授权；见 `docs/mac-auto-key.md`）；Linux：❌ |
 | V2 图片密钥进程收割 | ✅ | ❌ |
 | 计划任务一键安装 | ✅（Task Scheduler） | ❌（尚未做 launchd） |
 | 手机 App | ❌ | ❌（不做原生提取；报表 HTML / 窄屏 Web 可手机打开） |
@@ -432,7 +432,11 @@ python3 src/main.py serve --db-dir "$HOME/Library/Containers/com.tencent.xinWeCh
 用备份页「自动检测 / 深度搜索」，或从微信设置打开文件夹后粘贴 `db_storage`。
 
 **Q：密钥不足？**  
-4.1.10+：微信登录中点「提取密钥」。更早版本：退出 → 重登 → 立刻备份/提取。
+4.1.10+（Windows）：微信登录中点「提取密钥」。更早版本：退出 → 重登 → 立刻备份/提取。
+
+**Q：Mac 怎么找密钥？**  
+默认路线：打开应用内 [Mac 密钥新手指引](http://127.0.0.1:5000/mac-keys-guide) 或 `docs/mac-keys-guide.html`；常见做法是 Windows 同账号提一次后把完整密钥粘到 Mac「手动输入密钥」，或直接打开已解密备份。  
+高级模式：按 `docs/mac-auto-key.md` 自备 TraceMemo 的 `xkey_helper`、临时关闭 SIP 并完成管理员授权后，可在「提取密钥」页一键提钥；helper 二进制不随本项目分发。
 
 **Q：语音 404？**  
 会遍历全部 `media_*.db`；仍失败则重新做一次一键备份。
@@ -484,26 +488,27 @@ python src/main.py voice-export --chat 家族群 --merge-by person --format mp3
 
 - **源码**：https://github.com/yuuuzzh/wechat-export  
 - **维护者**：yuuu  
-- **最新正式 Release**：https://github.com/yuuuzzh/wechat-export/releases/tag/v0.5.0  
+- **最新正式 Release**：https://github.com/yuuuzzh/wechat-export/releases/tag/v0.6.0  
 - **Windows 可执行文件**：用本机 `quick_build.bat` / `build.bat` 打包，或见 Release 附件（若已上传）
 
 下载 exe 后双击即可；也可本地执行 `quick_build.bat` / `build.bat` 自行打包。分享包目录：`share_package/`（模板与说明）。macOS / Linux 请用源码：`python src/main.py`（详见 `docs/platform.md`）。
 
-### 8.1 `v0.5.0`（2026-11-23）
+### 8.1 `v0.6.0`（2026-11-24）
 
-相对 `v0.4.0` 的主要变化：**面向真实用户的体验大版本**。
+相对 `v0.5.0` 的主要变化：**macOS 高级一键提钥**（参考 TraceMemo 的调用契约）。
 
 | 方向 | 内容 |
 |------|------|
-| 首次引导 | 未备份时首页聚焦下一步；向导可操作；顶栏常用入口（聊天/搜索/导出/备份） |
-| 导出体验 | 常用/更多格式分层；勾选后条数与耗时粗估；最近导出历史；完成态打开文件夹 |
-| 搜索体验 | 简单搜索优先；无备份/无索引醒目 CTA；高级语法默认折叠 |
-| 回来续用 | 仪表盘「最近使用」+ 场景模板（导某人聊天 / 群日报 / 语音留给家人） |
-| 安全与提示 | 清理需勾选确认并输入 DELETE；媒体补迁确认；黑窗口说明；密钥页行内错误 |
-| 媒体缺失 | 图片/语音失败统一说明 + 媒体完整性 / 重新备份入口 |
-| 备份进度 | 阶段文案人话化；首次默认全部记录 |
+| 高级提钥 | 复刻架构判定 → SIP → 微信版本/PID → helper profile 分派 → 管理员授权 → 失败码映射；Apple Silicon `xkey_helper` / Intel Frida JSONL |
+| 密钥准入 | helper 返回的候选一律先过数据库首页 HMAC 才写配置；账号级密钥逐库试解，日志只输出脱敏密钥 |
+| 向导与 API | `/api/backup/mac-keyscan` SSE；首次向导 / 仪表盘 / 提取密钥页按 helper 就绪状态显示高级入口 |
+| 平台隔离 | macOS 独立策略链，`auto_key_extract_supported()` 保持 Windows-only，Windows 提钥链路零改动 |
+| 工具与指引 | `prepare_mac_key_helper.sh`（放置 + ad-hoc 签名 + 逐架构校验）、只读诊断 CLI、`docs/mac-auto-key.md`、Mac 密钥新手指引 |
+| 测试 | 新增 39 个用例覆盖输出契约、失败码、osascript 构造、HMAC 裁决与 UI 接线 |
 
-上一正式版 `v0.4.0`（2026-11-22）已含：笔记包、异步备份、群聊日报、Reader Skill、macOS/Linux 分析导出、工作区与向导、EML·mbox、导出插件。
+> helper 二进制不随本项目分发：TraceMemo 仓库无 LICENSE / NOTICE 且无源码，需用户自行放到已被 gitignore 的 `resources/mac/`。高级模式需临时关闭 SIP 并完成管理员授权，详情见 `docs/mac-auto-key.md`。
+
+上一正式版 `v0.5.0`（2026-11-23）已含：场景模板、媒体缺失提示、导出耗时粗估、搜索高级语法折叠、控制台提示，以及 macOS `.app` / DMG 打包。
 
 > `build.bat` 可能改写 `wechat_exp.spec`，构建后请还原仓库中的手工维护版本。
 
@@ -511,4 +516,4 @@ python src/main.py voice-export --chat 家族群 --merge-by person --format mp3
 
 ---
 
-**最后更新**：2026-11-23 · WeChat Export by yuuu · 最新正式 tag `v0.5.0`
+**最后更新**：2026-11-24 · WeChat Export by yuuu · 最新正式 tag `v0.6.0`

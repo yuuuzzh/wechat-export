@@ -237,6 +237,11 @@
       <div class="card-title">手动输入密钥</div>
       <div class="card-desc">已有密钥可直接粘贴校验，之后即可解密/备份/导出</div>
     </a>
+    <a href="/mac-keys-guide" class="dashboard-card" data-mac-only-card hidden>
+      <div class="card-icon px-icon px-icon-key" aria-hidden="true"></div>
+      <div class="card-title">Mac 密钥指引</div>
+      <div class="card-desc">新手分步：密钥从哪来、怎么粘贴（Mac 无自动提钥）</div>
+    </a>
     <a href="/decrypt" class="dashboard-card">
       <div class="card-icon px-icon px-icon-unlock" aria-hidden="true"></div>
       <div class="card-title">解密数据库</div>
@@ -275,6 +280,18 @@
       title: '下一步：提取解密密钥',
       desc: '请保持微信已登录并运行，然后提取本机数据库密钥。',
       label: '去提取密钥',
+      href: '/keyscan'
+    },
+    keysMac: {
+      title: '下一步：准备数据库密钥',
+      desc: 'Mac 默认需手动密钥；请先看新手指引，弄清密钥来源后再粘贴。',
+      label: '打开 Mac 密钥指引',
+      href: '/mac-keys-guide'
+    },
+    keysMacAdvanced: {
+      title: '下一步：Mac 高级提钥',
+      desc: '需自备 helper、临时关闭 SIP 并完成管理员授权；也可继续用手动密钥或已解密备份。',
+      label: '打开高级提钥',
       href: '/keyscan'
     },
     backup: {
@@ -372,6 +389,10 @@
     const data = await response.json();
     if (!response.ok || !data.ok) throw new Error('setup status unavailable');
 
+    if (data.mac_keys_guide) {
+      document.querySelectorAll('[data-mac-only-card]').forEach((el) => { el.hidden = false; });
+    }
+
     if (data.complete) {
       warning.hidden = true;
       mainAction.textContent = '打开聊天查看器';
@@ -400,12 +421,15 @@
       return;
     }
 
-    const next = nextSteps[data.next_step] || {
+    let next = nextSteps[data.next_step] || {
       title: '完成首次设置',
       desc: '跟随向导准备一份可浏览、可导出的本地备份。',
       label: '继续首次向导',
       href: '/setup'
     };
+    if (data.next_step === 'keys' && data.mac_keys_guide) {
+      next = data.mac_keys_advanced ? nextSteps.keysMacAdvanced : nextSteps.keysMac;
+    }
     title.textContent = next.title;
     desc.textContent = next.desc;
     action.textContent = next.label;

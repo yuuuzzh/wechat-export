@@ -45,6 +45,24 @@ def setup_status():
     current_abs = os.path.abspath(current) if current else ''
     has_backup = bool(current_abs and is_backup_dir(current_abs))
 
+    from engine.platform_info import (
+        auto_key_extract_supported, is_macos, mac_key_capabilities,
+    )
+
+    mac_caps = mac_key_capabilities(db_dir) if is_macos() else {}
+    mac_advanced = bool(is_macos() and mac_caps.get('auto_extract_ready'))
+    mac_keys = is_macos() or not auto_key_extract_supported()
+    keys_title = '提取数据库密钥' if (not mac_keys or mac_advanced) else '准备数据库密钥'
+    if mac_advanced:
+        keys_hint = (
+            'Mac 高级模式已就绪：需临时关闭 SIP + 管理员授权 + 微信停在登录页；'
+            '也可手动粘贴密钥或打开已解密备份'
+        )
+    elif mac_keys:
+        keys_hint = 'Mac 默认无自动提钥：看「Mac 密钥指引」后手动粘贴，或打开已解密备份'
+    else:
+        keys_hint = '微信保持登录；优先内存/配置提取'
+
     steps = [
         {
             'id': 'detect',
@@ -54,9 +72,9 @@ def setup_status():
         },
         {
             'id': 'keys',
-            'title': '提取数据库密钥',
+            'title': keys_title,
             'done': has_keys,
-            'hint': '微信保持登录；优先内存/配置提取',
+            'hint': keys_hint,
         },
         {
             'id': 'backup',
@@ -79,6 +97,9 @@ def setup_status():
         'complete': complete,
         'next_step': next_step,
         'steps': steps,
+        'mac_keys_guide': bool(mac_keys),
+        'mac_keys_advanced': mac_advanced,
+        'mac_auto_key': mac_caps,
         'wechat_running': bool(is_wechat_running()),
         'accounts': [
             {'wxid': a.get('wxid'), 'db_path': a.get('db_path')}

@@ -95,8 +95,8 @@ app = BUNDLE(
     info_plist={
         'CFBundleName': 'WeChat Export',
         'CFBundleDisplayName': 'WeChat Export',
-        'CFBundleShortVersionString': '0.5.0',
-        'CFBundleVersion': '2.15.20261123',
+        'CFBundleShortVersionString': '0.6.0',
+        'CFBundleVersion': '2.16.20261124',
         'NSHighResolutionCapable': True,
         'LSMinimumSystemVersion': '12.0',
         'NSAppleEventsUsageDescription':

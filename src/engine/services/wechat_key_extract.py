@@ -9,6 +9,10 @@ Strategies (tried in order):
   5. Hook + WeChat restart workflow (most reliable for legacy DBs)
   6. Memory scan fallback (hex pattern x'<key><salt>' + targeted salt scan)
 
+macOS uses a separate chain (config -> MMKV file-side -> mac_key providers ->
+cross-verify -> save) and never imports a Win32-bound module; see
+``_extract_all_keys_macos`` and ``engine/services/mac_key/``.
+
 WeChat 4.1+ no longer stores DB keys as plaintext hex strings in process memory.
 Keys are XOR-deobfuscated in-place by an inner function, used briefly in sqlite3_key(),
 then the plaintext is gone. Since 4.1.10 the WCDB runtime keeps a
@@ -1000,17 +1004,79 @@ def save_key_results(db_files, salt_to_dbs, key_map, db_dir, print_fn):
 # ---------------------------------------------------------------------------
 #  Main entry point
 # ---------------------------------------------------------------------------
+def _extract_all_keys_macos(db_dir, print_fn, progress_fn, use_mmkv,
+                            use_mac_provider):
+    """macOS-only strategy chain. Never imports a Win32-bound module.
+
+    Windows strategies (Config.Cipher / hook / memory scan) are intentionally
+    skipped here: they bind ``ctypes.windll`` at import time and would only
+    produce swallowed exceptions on a Mac.
+    """
+    progress_fn(0, "Collecting DB files...")
+    db_files, salt_to_dbs = collect_db_files(db_dir)
+    if not db_files:
+        raise RuntimeError("No .db files found in db_storage directory")
+    total = len(salt_to_dbs)
+    print_fn(f"Found {len(db_files)} DB files, {total} unique salts")
+    key_map = {}
+
+    loaded = load_from_config(db_dir, db_files, salt_to_dbs, key_map, print_fn)
+    if loaded == total:
+        print_fn("[Config] All keys loaded from existing config!")
+        return key_map
+
+    # File-side MMKV extraction is platform-neutral Python. On macOS WeChat
+    # 4.2.0 the MMKV mmap layout differs, so this usually returns 0; keeping
+    # it first means a compatible build works with zero permissions.
+    if use_mmkv and len(key_map) < total:
+        progress_fn(10, "Trying MMKV file-side extraction...")
+        try:
+            found = extract_keys_from_mmkv(db_dir, db_files, salt_to_dbs,
+                                           key_map, print_fn)
+            progress_fn(20, f"MMKV: {found} keys extracted")
+            if not found:
+                print_fn("[MMKV] 未命中；macOS 版 MMKV 布局与 Windows 不同，"
+                         "转入 helper provider（诊断：PYTHONPATH=src python -m engine.services.mac_key）")
+        except Exception as e:
+            print_fn(f"[MMKV] Error: {e}")
+
+    if use_mac_provider and len(key_map) < total:
+        progress_fn(30, "检查 macOS 密钥 provider...")
+        try:
+            from engine.services.mac_key import extract_keys_via_mac_provider
+            found = extract_keys_via_mac_provider(
+                db_dir, db_files, salt_to_dbs, key_map, print_fn, progress_fn)
+            progress_fn(70, f"MacKey: {found} keys verified")
+        except Exception as e:
+            print_fn(f"[MacKey] Error: {e}")
+
+    cross_verify_keys(db_files, salt_to_dbs, key_map, print_fn)
+    if not key_map:
+        print_fn("\n[MacKey] 本机没有取到可用密钥。")
+        print_fn("默认路线：用「手动输入密钥」粘贴已有密钥，或直接打开已解密备份。")
+        print_fn("高级模式（参考 TraceMemo）：需自备 xkey_helper、临时关闭 SIP、管理员授权，"
+                 "并让微信停在登录页；见 docs/mac-auto-key.md。")
+        return {}
+
+    progress_fn(98, "Saving results...")
+    save_key_results(db_files, salt_to_dbs, key_map, db_dir, print_fn)
+    progress_fn(100, "Done!")
+    return key_map
+
+
 def extract_all_keys(db_dir, print_fn=None, progress_fn=None,
-                     use_hook=True, use_mmkv=True, use_memory_scan=True):
+                     use_hook=True, use_mmkv=True, use_memory_scan=True,
+                     use_mac_provider=True):
     """Extract all DB keys using the best available strategy.
 
     Args:
         db_dir: Path to WeChat db_storage directory
         print_fn: Logging function (default: print)
         progress_fn: Progress callback (pct, msg)
-        use_hook: Enable API hook strategy (requires admin)
+        use_hook: Enable API hook strategy (requires admin, Windows only)
         use_mmkv: Enable MMKV offline extraction
-        use_memory_scan: Enable memory scanning fallback
+        use_memory_scan: Enable memory scanning fallback (Windows only)
+        use_mac_provider: Enable the macOS provider chain (macOS only)
 
     Returns:
         dict: {salt_hex: enc_key_hex}
@@ -1019,6 +1085,10 @@ def extract_all_keys(db_dir, print_fn=None, progress_fn=None,
         print_fn = print
     if progress_fn is None:
         progress_fn = lambda pct, msg: None
+
+    if sys.platform == 'darwin':
+        return _extract_all_keys_macos(db_dir, print_fn, progress_fn,
+                                       use_mmkv, use_mac_provider)
 
     progress_fn(0, "Collecting DB files...")
     db_files, salt_to_dbs = collect_db_files(db_dir)
